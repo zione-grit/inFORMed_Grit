@@ -1,6 +1,7 @@
 // Turns a voice recording into text. The audio is sent to OpenAI and not kept.
 const { transcribe } = require('../lib/core/voice');
 const { overLimit, LIMIT_REPLY, ip, codeOk } = require('../lib/core/guard');
+const counters = require('../lib/core/counters');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only.' });
@@ -14,6 +15,7 @@ module.exports = async (req, res) => {
     const buf = Buffer.from(String(audio), 'base64');
     if (buf.length > 3.2 * 1024 * 1024) return res.status(413).json({ error: 'That recording is too long. Please keep it under about three minutes.' });
     const text = await transcribe(buf, mime, lang);
+    await counters.count('voice_in', { lang });
     return res.status(200).json({ text });
   } catch (e) {
     console.error('Transcribe error:', e.message);

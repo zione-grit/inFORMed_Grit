@@ -1,4 +1,4 @@
-// Website chat endpoint. The OpenAI key lives only in Vercel's environment variables.
+// Website chat endpoint. The OpenAI key lives only in Secret Manager.
 const { turn } = require('../lib/core/engine');
 const { overLimit, LIMIT_REPLY, ip, codeOk } = require('../lib/core/guard');
 

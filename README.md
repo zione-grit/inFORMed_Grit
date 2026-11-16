@@ -16,9 +16,11 @@ Channels: the **website** and **WhatsApp**. On WhatsApp, `FORM` shows the applic
 ## How the code is organised
 
 ```
-server.js                  runs inFORMed as one web server on Google Cloud Run (or any computer with Node)
-Dockerfile                 how Google Cloud builds it
-api/                       the endpoints; the same files run on Google Cloud Run and on Vercel
+firebase.json              the Firebase set-up: Hosting for the website, one function for the endpoints
+public/config.js           the address of the function, which the website calls
+index.js                  the Firebase function that runs the endpoints, in Johannesburg
+server.js                  runs inFORMed on your own computer, and for the automatic checks
+api/                       the endpoints
   chat.js                  website chat (one turn)
   document.js              builds the PDF or Word document
   whatsapp.js              WhatsApp webhook
@@ -35,12 +37,16 @@ lib/core/                  shared by every tool
   guard.js                 message limits and the optional access code
   store.js                 WhatsApp conversation state (Upstash Redis, deleted after 24 hours)
   background.js            finishing WhatsApp work after the webhook is answered
+  knowledge.js             reads and checks legal source records; only approved ones are used
+  counters.js              content-free usage counters (Firestore in Johannesburg)
 lib/tools/
   index.js                 the list of tools
   protection-order/        the first tool
     index.js               what the core needs from the tool (see the comment at the top)
     rules.js               the AI's instructions and answer schema for this tool
-    knowledge.js           system prompt (v8.14) and the six reference documents
+    knowledge.js           system prompt (v8.14), and the approved legal sources the AI reads
+    sources/               the legal sources: one record (JSON file) per source, with its review status
+    workflow.json          the protection order workflow: steps, fields, levels, rules, legal sources
     render.js              PDF, Word and text versions of the form
     official.js            fills the government's own PDF form
     forms/J480E-2025-03.pdf  the Department of Justice's Form 6 and 6A
@@ -50,7 +56,13 @@ public/                    the website
   index.html               home page, chat, form panel, demo, sources
   fields.js                the protection order form definition, shared by the website and the server
   i18n.js                  all page text in English, isiZulu and Afrikaans
-  docs.json                the reference documents, for the sources view
+  docs.json                the approved legal sources, for the sources view (written by npm run review)
+review/
+  protection-order.md      readable page of the legal sources and the workflow, for the legal advisor
+scripts/
+  review.js                writes review/ and public/docs.json (npm run review)
+test/
+  smoke.js                 the automatic checks (npm test)
 ```
 
 ### Adding a tool
@@ -74,44 +86,99 @@ Settings: `MODEL`, `REASONING_EFFORT`, `TRANSCRIBE_MODEL`, `TTS_MODEL`, `TTS_VOI
 
 The move to these models and to the core-and-tools structure was checked against a local stand-in for OpenAI: the instructions sent to the AI are word for word the same as before for the website and WhatsApp, both modes, voice and translation, and the PDF and Word documents are identical. It has not yet been run against the real new models. Before real users, run the golden and red-team tests and listen to replies in each language.
 
-## Hosting on Google Cloud (Johannesburg)
+## Legal sources
 
-inFORMed runs on **Google Cloud Run** in `africa-south1` (Johannesburg), under GRIT's Google Cloud organisation and billing account, next to Zuzi. The same code still runs on Vercel, so the demo can stay up until the new address is ready.
+Every legal source the protection order module uses is a record in `lib/tools/protection-order/sources/`, one JSON file each. Each record has these fields:
 
-One-time setup (Windows Command Prompt, with the Google Cloud CLI installed and `gcloud auth login` done):
+| Field | What it holds |
+|---|---|
+| `document_id` | Short id; the file is named after it |
+| `legal_tool` | The legal module, `protection_order` |
+| `jurisdiction` | `ZA` |
+| `document_type` | `act`, `regulation`, `official_form`, `court_guidance`, `procedure`, `approved_guidance` or `service_information` |
+| `title`, `about` | Name, and one line on what it is for |
+| `source_url`, `source_file` | Where it came from |
+| `legal_reference` | Section, regulation or form number |
+| `effective_date` | When it applies (YYYY-MM-DD, empty until known) |
+| `version` | Version of the source |
+| `reviewed_by`, `review_date`, `next_review` | The legal review |
+| `approval_status` | `draft`, `under_review`, `approved` or `superseded` |
+| `superseded_by` | For a superseded record, the record that replaced it |
+| `content` | The approved text the AI reads |
 
-1. Create the project and connect billing (or do this in the Cloud console):
-   `gcloud projects create informed-grit --organization=ORGANISATION_ID`
-   `gcloud billing projects link informed-grit --billing-account=BILLING_ACCOUNT_ID`
-2. Turn on the services:
-   `gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com --project informed-grit`
+Only records with `approval_status: approved` are given to the AI and shown under "Sources". A broken record (a missing field, a wrong status, a date not written as YYYY-MM-DD, a superseded record that does not say what replaced it) stops the server from starting and fails `npm test`, so mistakes are found at once.
+
+The six documents the prototype has always used are records now, marked approved with `reviewed_by: GRIT`, because they are GRIT's material already in use. Their `review_date` is empty until the legal advisor reviews them, so the review page lists them as "needs legal review". The AI receives exactly the same text as before: the move to records was checked word for word.
+
+To add a source: copy a record, give it a new `document_id` and file name, fill in the fields, set `approval_status` to `draft`, and run `npm run review`. When the legal advisor approves it, set `approved`, `reviewed_by`, `review_date` and `next_review`, run `npm run review` again, and deploy.
+
+## Workflow
+
+`lib/tools/protection-order/workflow.json` describes the protection order application as ten steps, in the order of the official form. Each step names the paragraphs of Form 6 and Form 6A it fills (inFORMed's step numbers are not the form's paragraph numbers: step 5, "What happened", is paragraph 4 of Form 6). Each step holds when it applies, its opening question (English; isiZulu and Afrikaans to be added by native speakers), every form field with its level (required, if known, if it applies, optional), its rules, the legal sources it relies on, and the next step. Its status is `pending_legal_review` until the legal advisor approves it.
+
+The levels never block anyone: every question can be skipped, "I don't know" is recorded honestly, and missing information or evidence never stops the applicant from generating the form.
+
+The conversation itself still follows the AI's instructions in `rules.js`, which match these steps. The workflow file is the version the legal advisor reviews and approves; next, the engine will read it directly, so an approved change to the workflow changes inFORMed without changing code. `npm test` already checks that every field on the form is in exactly one step, and that every step links only to approved sources.
+
+## Review page
+
+`npm run review` writes `review/protection-order.md`, a readable page with every legal source and its review status, and the whole workflow step by step. GitHub shows it as an ordinary page, so the legal advisor can review it without reading code. The same command keeps `public/docs.json` (the "Sources" view) in step with the approved sources. `npm test` fails if either is out of date.
+
+## Usage counters
+
+inFORMed counts how it is used, without keeping anything anyone wrote: no names, no messages, no form content, no phone numbers or internet addresses. Each count is a few fixed labels:
+
+- **turn:** tool, channel (web or WhatsApp), language chosen, mode (fill or ask), typed or spoken, the result (reply, support line added, safety reply, or error) and the furthest form section reached so far (s0 to s10), which shows where people stop
+- **document:** tool and format (PDF or Word)
+- **voice_in, listen, hear_form:** speaking, listening and "Hear my form", by language
+
+Any label that is not on the allowed list in `lib/core/counters.js` is saved as "other", so content cannot slip in. Counting never changes or blocks a reply. A reply waits at most half a second for its count to be saved, and emergency replies do not wait at all. A count that cannot be saved is dropped, and the function's log says so ("Counter not saved"), so a broken counter is noticed.
+
+On Firebase, counts go to Firestore, one document per day in the `usage_daily` collection (for example `usage_daily/2026-11-16`). One-time step: in the Firebase console for `informed-grit`, open **Firestore Database → Create database**, choose **africa-south1 (Johannesburg)** and production mode. Nothing else is needed: the function writes with its own service account, and the Firestore rules can stay closed to everyone else. On your own computer counting is off; `COUNTERS=memory` keeps counts in memory, and `COUNTERS=off` turns counting off anywhere.
+
+## Hosting on Firebase (Johannesburg)
+
+inFORMed runs on **Firebase**, in its own project, `informed-grit`, under GRIT's Google Cloud organisation and billing account. It is set up the same way as Zuzi, but in a separate project, so inFORMed's keys, costs, logs and traffic stay apart from Zuzi's.
+
+- **Firebase Hosting** serves the website (everything in `public/`).
+- **One Firebase function, `api`**, runs every endpoint in `api/`. It runs in `africa-south1` (Johannesburg). While I am building, no copy runs when nobody is using inFORMed (`minInstances: 0`), so there is no fixed monthly cost.
+- **The website calls the function at its own address**, worked out in `public/config.js` from the website's address. Firebase Hosting cannot pass requests on to a Johannesburg function, so the website does not go through Hosting for them. What people write therefore goes straight to Johannesburg. Hosting only delivers the pages.
+- **Secret Manager** holds the keys.
+
+`firebase.json` holds this set-up, `.firebaserc` names the project, and `index.js` is the function. The function only lets pages from the inFORMed website call it from a browser (`SITES` in `index.js`). When inFORMed gets its own web address, add it to `EXTRA_SITES` there.
+
+One-time setup (Windows Command Prompt, with the Firebase CLI already used for Zuzi):
+
+1. In the Firebase console, add a project called `informed-grit` under GRIT's organisation and put it on the **Blaze** plan (functions need it). If Firebase gives the project a different id (for example `informed-grit-1a2b`), put that id in `.firebaserc` and use it in the commands below. `public/config.js` reads the id from the website's address, so it needs no change.
+2. Sign in if needed: `firebase login`
 3. Store the OpenAI key in Secret Manager (never in a file in the repo). Open a temporary Notepad file, paste the key, save, run one command, delete the file:
    `notepad %TEMP%\k.txt`
-   `gcloud secrets create openai-key --data-file=%TEMP%\k.txt --project informed-grit`
+   `firebase functions:secrets:set OPENAI_API_KEY --data-file "%TEMP%\k.txt" --project informed-grit`
    `del %TEMP%\k.txt`
-4. Let Cloud Run read the secret (the project number is shown by `gcloud projects describe informed-grit`):
-   `gcloud secrets add-iam-policy-binding openai-key --member=serviceAccount:PROJECT_NUMBER-compute@developer.gserviceaccount.com --role=roles/secretmanager.secretAccessor --project informed-grit`
 
 Deploy (from the inFORMed folder, every time you want to publish changes):
 
-`gcloud run deploy informed --source . --region africa-south1 --project informed-grit --allow-unauthenticated --set-secrets OPENAI_API_KEY=openai-key:latest --memory 1Gi --timeout 120 --max-instances 5`
+`firebase deploy --only functions,hosting --project informed-grit`
 
-The command prints the new address (ending in `.run.app`); `/form` opens straight on the form. `--max-instances 5` caps how many copies can run at once, which also caps cost. Other settings (for example `LIMIT_PER_HOUR`, `MODEL`) are added with `--update-env-vars NAME=value`. WhatsApp keys go into Secret Manager the same way as the OpenAI key.
+The website is then at `https://informed-grit.web.app`; `/form` opens straight on the form. Always publish the website and the function together, so they stay in step.
+
+After the first deploy, check that the chat answers on the live site. If it does not, copy the "Function URL" that the deploy printed into `API_OVERRIDE` in `public/config.js` and deploy again.
+
+Other settings (for example `LIMIT_PER_HOUR`, `MODEL`, `WHATSAPP_PHONE_NUMBER_ID`) go in a file called `.env.informed-grit` in this folder, one `NAME=value` per line. Firebase reads it when deploying. It is not committed to GitHub. Never put a key in it: keys go in Secret Manager, and each key's name is added to `SECRET_NAMES` in `index.js`.
 
 Notes:
-- Limits and WhatsApp conversations use Upstash Redis when `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set. Without it, each running copy counts and remembers on its own, which is rough for limits and loses WhatsApp conversations between copies. Upstash works from Google Cloud too.
-- On Cloud Run, WhatsApp messages are answered before the webhook replies "ok" (Cloud Run stops a request once it has replied). Duplicate deliveries from Meta are ignored.
-- To run it on your own computer: `npm install`, set `OPENAI_API_KEY`, then `node server.js` and open http://localhost:8080.
-
-### On Vercel (the demo)
-
-The demo keeps working on Vercel with the same code: `api/` runs as Vercel functions and `vercel.json` includes the government PDF. Settings are under **Settings → Environment Variables** (`OPENAI_API_KEY`, optional `DEMO_PASSCODE`, and the settings above).
+- No copy of the function runs while nobody is using inFORMed (`minInstances: 0` in `index.js`), so the first message after a quiet spell waits a few seconds while a copy starts. Before the pilot, set it to `1` so nobody waits; that adds a small fixed monthly cost. At most 5 copies run at once (`maxInstances`), which also caps cost.
+- Cost while building: Firebase Hosting is free at this size, and the function stays within the Blaze plan's free monthly allowance at testing volumes. The only steady charge is a few cents a month for storing the function's build. OpenAI is billed separately.
+- Limits and WhatsApp conversations use Upstash Redis when `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set. Without it, each running copy counts and remembers on its own, which is rough for limits and loses WhatsApp conversations between copies.
+- WhatsApp messages are answered before the webhook replies "ok" (a function may be stopped once it has replied). Duplicate deliveries from Meta are ignored.
+- To run it on your own computer: `npm install`, set `OPENAI_API_KEY`, then `node server.js` and open http://localhost:8080. `npm test` runs the automatic checks.
+- npm may warn that this computer's Node version is not 22. Firebase runs the function on Node 22; the warning can be ignored.
 
 ### Limits
 
 - `LIMIT_PER_HOUR` (default 150): messages one person can send in an hour (by internet address on the website, by chat on WhatsApp).
 - `LIMIT_PER_DAY` (default 3000): messages across everyone per day. When it is reached, inFORMed says so and still gives the emergency numbers. Listening and voice recordings have their own separate limits.
-- Also set a **monthly budget limit** on the OpenAI key (platform.openai.com → Settings → Limits), and a budget alert on the Google Cloud billing account. Those are the final safety nets for cost.
+- Also set a **monthly budget limit** on the OpenAI key (platform.openai.com → Settings → Limits), and a budget alert on the Google Cloud billing account for `informed-grit`. Those are the final safety nets for cost.
 
 ## WhatsApp (needs a Meta developer account)
 
@@ -137,7 +204,7 @@ Words the WhatsApp bot understands: `ASK`, `FILL`, `FORM`, `PDF`, `WORD`, `LANGU
 
 **If the Department of Justice changes the form:** replacing the PDF file alone is not enough, because the box names and positions will change. Put the new PDF in `lib/tools/protection-order/forms/`, then update the box names in `lib/tools/protection-order/official.js` and the fields in `public/fields.js`. Check the Justice website for a new version before going live.
 
-GRIT's original reference document and system prompt describe the older "Form 2" from the 1999 regulations, which were repealed. The model is told to use the Form 6/6A fields, and the reference document in `lib/tools/protection-order/knowledge.js` describes Form 6/6A.
+GRIT's original reference document and system prompt describe the older "Form 2" from the 1999 regulations, which were repealed. The model is told to use the Form 6/6A fields, and the `form` source record in `lib/tools/protection-order/sources/form.json` describes Form 6/6A.
 
 ## Keeping the form
 
@@ -151,7 +218,7 @@ The look follows Shamryn Brittan's GRIT design concept (October 2026): GRIT navy
 
 The design's images are in `public/img/` (Shamryn's files, compressed for the web): `bg-blue.webp` and `bg-blue-tall.webp` (page background on wide and tall screens), `about-grit.webp` (About GRIT photo), `community.webp` (first Good to know card), `grit-logo-blue.webp` and `logo-paper.webp` (logos). To replace a picture, put a new file in with the same name and push.
 
-Direct-to-form link: `https://informedgrit.vercel.app/form` opens straight into "Help me fill in my form".
+Direct-to-form link: `https://informed-grit.web.app/form` opens straight into "Help me fill in my form".
 
 ## Opening and "Read more"
 
@@ -211,7 +278,7 @@ All interface text is in `public/i18n.js`. The isiZulu and Afrikaans text is a *
 
 ## Sources (developer view)
 
-Users do not see which document each answer came from. To see it, open the site with `?sources` at the end of the address (for example `https://YOUR-SITE.vercel.app/?sources`). The "Based on" labels and a "Sources (developer view)" button then appear for that browser tab. For WhatsApp, set `SHOW_SOURCES=1`. The "General information, not from GRIT's guides" label stays visible to everyone, because it tells people to check that answer with the court clerk.
+Users do not see which document each answer came from. To see it, open the site with `?sources` at the end of the address (for example `https://informed-grit.web.app/?sources`). The "Based on" labels and a "Sources (developer view)" button then appear for that browser tab. For WhatsApp, set `SHOW_SOURCES=1`. The "General information, not from GRIT's guides" label stays visible to everyone, because it tells people to check that answer with the court clerk.
 
 ## Safety design
 
@@ -236,5 +303,8 @@ Users do not see which document each answer came from. To see it, open the site 
 - Safeguarding sign-off on the crisis replies and flow.
 - Verify Meta's webhook signature (`X-Hub-Signature-256`) against the raw request body.
 - A shared rate limit (the current one is per server instance) and a POPIA review of the 24-hour bot storage.
+- The per-person limit trusts the internet address the request claims to come from. Check which address Firebase passes on after the first deploy, and use that one (`ip` in `lib/core/guard.js`).
+- Firebase Hosting delivers the pages from Google's global network and keeps the internet address of each visitor for a few months. It does not see what people write. Say this in the privacy notice and the POPIA assessment.
+- Reading aloud sends the text to be read in the address of the request (`/api/speak?t=...`), and Google keeps request addresses in the function's logs. Move the text into the body of the request, or switch off request logging for the function, before real users.
 - Brand colours are taken from the GRIT logo (navy, teal, indigo). Change the tokens at the top of `public/index.html` if GRIT has official colour codes.
 - Using conversations to improve the bot needs survivors' informed opt-in consent, POPIA compliance and GRIT's written authorisation and safeguarding sign-off. This build saves nothing for training.

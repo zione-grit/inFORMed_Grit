@@ -2,6 +2,7 @@
 // GET /api/speak?t=<base64url text>&l=<lang>  — returns MP3. The page asks for one sentence at a time, so playback starts quickly.
 const { speakStream } = require('../lib/core/voice');
 const { overLimit, ip, codeOk } = require('../lib/core/guard');
+const counters = require('../lib/core/counters');
 
 function fromB64url(s) {
   return Buffer.from(String(s || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
@@ -21,6 +22,7 @@ module.exports = async (req, res) => {
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Cache-Control', 'no-store');
     res.statusCode = 200;
+    await counters.count('listen', { lang });
     if (upstream.mp3) { res.setHeader('Content-Length', upstream.mp3.length); return res.end(upstream.mp3); }
     const reader = upstream.body.getReader();
     for (;;) {

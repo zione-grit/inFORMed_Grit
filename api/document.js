@@ -1,6 +1,7 @@
 // Builds the PDF or Word draft from the form the browser sends. Nothing is stored.
 const { ensureEnglish } = require('../lib/core/engine');
 const tools = require('../lib/tools');
+const counters = require('../lib/core/counters');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).send('POST only.');
@@ -18,6 +19,7 @@ module.exports = async (req, res) => {
     res.setHeader('Content-Type', isWord ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${tool.documents.fileName(format, demo)}"`);
     res.setHeader('Cache-Control', 'no-store');
+    await counters.count('document', { tool: tool.id, format: isWord ? 'docx' : 'pdf' });
     return res.status(200).send(buf);
   } catch (e) {
     console.error('Document error:', e.message);

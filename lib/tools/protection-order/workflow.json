@@ -1,0 +1,647 @@
+{
+  "workflow_id": "za_protection_order_application",
+  "legal_tool": "protection_order",
+  "jurisdiction": "ZA",
+  "form": "Form 6 and Form 6A (J480E, March 2025)",
+  "version": "1.0",
+  "approval_status": "pending_legal_review",
+  "reviewed_by": "",
+  "review_date": "",
+  "field_needs": {
+    "required": "The court needs it. Still never blocks the application: if the applicant does not know, that is recorded.",
+    "if_known": "Asked once; left empty if the applicant does not know.",
+    "if_relevant": "Asked only when the applicant's situation makes it apply.",
+    "optional": "Offered, never pressed."
+  },
+  "if_unknown": "Every question can be skipped. \"I don't know\" is recorded honestly and never guessed, and missing information or evidence never stops the applicant from generating the form.",
+  "steps": [
+    {
+      "step_id": "about_you",
+      "form_section": 1,
+      "form_paragraphs": [
+        "Form 6, paragraph 1",
+        "Form 6A, paragraph 1"
+      ],
+      "title": "About you",
+      "key_section": false,
+      "applies": "always",
+      "questions": {
+        "en": "Let's start with you. What is your name, and how can the court contact you?",
+        "zu": "",
+        "af": ""
+      },
+      "fields": [
+        {
+          "id": "c_surname",
+          "label": "Surname",
+          "need": "required"
+        },
+        {
+          "id": "c_names",
+          "label": "Full names",
+          "need": "required"
+        },
+        {
+          "id": "c_id",
+          "label": "ID number / date of birth",
+          "need": "required"
+        },
+        {
+          "id": "c_address",
+          "label": "Home or temporary address",
+          "need": "required"
+        },
+        {
+          "id": "c_phone",
+          "label": "Home/contact telephone number, and cell phone number for application updates",
+          "need": "required"
+        },
+        {
+          "id": "c_email",
+          "label": "Email address, or other social media account where the court can contact you",
+          "need": "optional"
+        },
+        {
+          "id": "c_av",
+          "label": "Would you prefer the matter to be heard through an audiovisual link (if available)? Contact for the link",
+          "need": "optional"
+        },
+        {
+          "id": "c_work_address",
+          "label": "Work address",
+          "need": "optional"
+        },
+        {
+          "id": "c_work_phone",
+          "label": "Work telephone number",
+          "need": "optional"
+        },
+        {
+          "id": "c_relationship",
+          "label": "Nature of domestic relationship with the respondent",
+          "need": "required"
+        },
+        {
+          "id": "c_occupation",
+          "label": "Occupation (including learner/student)",
+          "need": "optional"
+        }
+      ],
+      "validation_rules": [
+        "The ID number or date of birth is written as given; a date of birth is accepted when there is no ID number.",
+        "The relationship to the respondent must be a domestic relationship under the Act. If it is not, the applicant is told about a harassment order instead and referred."
+      ],
+      "legal_sources": [
+        "form",
+        "rights"
+      ],
+      "next_step": "someone_applying_for_you"
+    },
+    {
+      "step_id": "someone_applying_for_you",
+      "form_section": 2,
+      "form_paragraphs": [
+        "Form 6, paragraph 2",
+        "Form 6A, paragraph 2"
+      ],
+      "title": "Someone applying for you",
+      "key_section": false,
+      "applies": "only when someone applies on behalf of the person who needs protection",
+      "questions": {
+        "en": "Are you filling this in for yourself, or for someone else?",
+        "zu": "",
+        "af": ""
+      },
+      "fields": [
+        {
+          "id": "tp_names",
+          "label": "Surname and full names",
+          "need": "required"
+        },
+        {
+          "id": "tp_capacity",
+          "label": "Capacity (care giver, counsellor, educator, family member, health care personnel, medical practitioner, social worker, SAPS member, related person, other)",
+          "need": "required"
+        },
+        {
+          "id": "tp_contact",
+          "label": "ID number / date of birth, email, work address and telephone, occupation",
+          "need": "required"
+        },
+        {
+          "id": "tp_reason",
+          "label": "Reason(s) why the application is made on behalf of the victim",
+          "need": "required"
+        },
+        {
+          "id": "tp_consent",
+          "label": "Written consent of the victim (obtained and attached, or why it is not necessary)",
+          "need": "required"
+        }
+      ],
+      "validation_rules": [
+        "The written consent of the person who needs protection is required, or the reason it is not necessary is given."
+      ],
+      "legal_sources": [
+        "form",
+        "rights"
+      ],
+      "next_step": "the_person_harming_you"
+    },
+    {
+      "step_id": "the_person_harming_you",
+      "form_section": 3,
+      "form_paragraphs": [
+        "Form 6, paragraph 3"
+      ],
+      "title": "The person harming you",
+      "key_section": false,
+      "applies": "always",
+      "questions": {
+        "en": "Tell me about the person who is harming you. What is their name, and how are you related?",
+        "zu": "",
+        "af": ""
+      },
+      "fields": [
+        {
+          "id": "r_relationship",
+          "label": "Relationship to you (for example boyfriend, ex-husband, father, sister-in-law, co-resident)",
+          "need": "required"
+        },
+        {
+          "id": "r_surname",
+          "label": "Surname (if known)",
+          "need": "if_known"
+        },
+        {
+          "id": "r_names",
+          "label": "Full names, or the name you know them by",
+          "need": "required"
+        },
+        {
+          "id": "r_id",
+          "label": "ID number / date of birth if known, or estimated age",
+          "need": "if_known"
+        },
+        {
+          "id": "r_address",
+          "label": "Home address (if known)",
+          "need": "if_known"
+        },
+        {
+          "id": "r_phone",
+          "label": "Home/work/other contact telephone number and cell phone number (if known)",
+          "need": "if_known"
+        },
+        {
+          "id": "r_email",
+          "label": "Email address (if known)",
+          "need": "if_known"
+        },
+        {
+          "id": "r_social",
+          "label": "Social media platforms, and the name, handle or number on each account (if known)",
+          "need": "if_known"
+        },
+        {
+          "id": "r_work",
+          "label": "Work/school/study address (if known)",
+          "need": "if_known"
+        },
+        {
+          "id": "r_occupation",
+          "label": "Occupation, including learner/student (if known)",
+          "need": "if_known"
+        }
+      ],
+      "validation_rules": [
+        "The relationship is chosen from the official list on the form.",
+        "Unknown details are left empty, never guessed."
+      ],
+      "legal_sources": [
+        "form",
+        "rights"
+      ],
+      "next_step": "others_affected"
+    },
+    {
+      "step_id": "others_affected",
+      "form_section": 4,
+      "form_paragraphs": [
+        "Form 6A, paragraph 3"
+      ],
+      "title": "Others affected",
+      "key_section": false,
+      "applies": "when children or other people are affected",
+      "questions": {
+        "en": "Is anyone else affected, such as children or other people living with you?",
+        "zu": "",
+        "af": ""
+      },
+      "fields": [
+        {
+          "id": "p_people",
+          "label": "3.1 Children and adults sharing the residence (name, age, relationship to you)",
+          "need": "if_relevant"
+        },
+        {
+          "id": "p_how",
+          "label": "3.2 How are these persons affected?",
+          "need": "if_relevant"
+        },
+        {
+          "id": "p_disabilities",
+          "label": "3.3 Do any of these persons have disabilities? Details",
+          "need": "if_relevant"
+        },
+        {
+          "id": "p_witnesses",
+          "label": "Name and contact details of any person who witnessed the incident",
+          "need": "optional"
+        }
+      ],
+      "validation_rules": [
+        "Children's details are limited to what the form asks for."
+      ],
+      "legal_sources": [
+        "form",
+        "guide"
+      ],
+      "next_step": "what_happened"
+    },
+    {
+      "step_id": "what_happened",
+      "form_section": 5,
+      "form_paragraphs": [
+        "Form 6, paragraph 4"
+      ],
+      "title": "What happened",
+      "key_section": true,
+      "applies": "always",
+      "questions": {
+        "en": "Can you tell me what happened most recently? Take your time.",
+        "zu": "",
+        "af": ""
+      },
+      "fields": [
+        {
+          "id": "history",
+          "label": "History of abuse (earlier incidents and how things have got worse)",
+          "need": "required"
+        },
+        {
+          "id": "inc1_date",
+          "label": "Most recent incident: date",
+          "need": "required"
+        },
+        {
+          "id": "inc1_place",
+          "label": "Most recent incident: place where it happened (or social media account details)",
+          "need": "required"
+        },
+        {
+          "id": "inc1_details",
+          "label": "Most recent incident: details of what happened",
+          "need": "required"
+        },
+        {
+          "id": "inc1_injuries",
+          "label": "Most recent incident: any injuries (including what was used)",
+          "need": "if_relevant"
+        },
+        {
+          "id": "inc1_treatment",
+          "label": "Most recent incident: medical, psychological or other treatment received",
+          "need": "if_relevant"
+        },
+        {
+          "id": "inc1_harm",
+          "label": "Most recent incident: harm or damages caused",
+          "need": "if_relevant"
+        },
+        {
+          "id": "inc2_date",
+          "label": "Previous incident: date",
+          "need": "optional"
+        },
+        {
+          "id": "inc2_place",
+          "label": "Previous incident: place where it happened",
+          "need": "optional"
+        },
+        {
+          "id": "inc2_details",
+          "label": "Previous incident: details of what happened",
+          "need": "optional"
+        },
+        {
+          "id": "inc2_injuries",
+          "label": "Previous incident: any injuries (including what was used)",
+          "need": "optional"
+        },
+        {
+          "id": "inc2_treatment",
+          "label": "Previous incident: treatment received",
+          "need": "optional"
+        },
+        {
+          "id": "inc2_harm",
+          "label": "Previous incident: harm or damages caused",
+          "need": "optional"
+        },
+        {
+          "id": "other_info",
+          "label": "Other information the court should know",
+          "need": "optional"
+        }
+      ],
+      "validation_rules": [
+        "Dates are real dates and not in the future, or \"I don't remember exactly\" with the closest time given.",
+        "Statements are in the first person and call the other person \"the respondent\".",
+        "Only facts the applicant gave: nothing added, softened or strengthened.",
+        "Everything is written in English for the court."
+      ],
+      "legal_sources": [
+        "form",
+        "language",
+        "magistrates",
+        "evidence"
+      ],
+      "next_step": "why_it_is_urgent"
+    },
+    {
+      "step_id": "why_it_is_urgent",
+      "form_section": 6,
+      "form_paragraphs": [
+        "Form 6, paragraph 5"
+      ],
+      "title": "Why it is urgent",
+      "key_section": true,
+      "applies": "always",
+      "questions": {
+        "en": "Why do you need protection now? Are you still living in the same place, and are there weapons in the house?",
+        "zu": "",
+        "af": ""
+      },
+      "fields": [
+        {
+          "id": "urg_why",
+          "label": "Why is the application urgent?",
+          "need": "if_relevant"
+        },
+        {
+          "id": "urg_today",
+          "label": "Any other reasons why you need a protection order today?",
+          "need": "optional"
+        },
+        {
+          "id": "urg_same_place",
+          "label": "Are you still staying in the same place as the respondent?",
+          "need": "required"
+        },
+        {
+          "id": "urg_weapons",
+          "label": "Are there firearms or other weapons in the house? Details",
+          "need": "required"
+        },
+        {
+          "id": "urg_firearm_work",
+          "label": "Does the respondent carry or have access to a firearm for work or other activities? Details",
+          "need": "if_known"
+        },
+        {
+          "id": "urg_fear",
+          "label": "Do you fear for your life or safety, or that of your children, relatives or others? Details",
+          "need": "required"
+        },
+        {
+          "id": "urg_drugs",
+          "label": "Does the respondent use drugs, needing referral to a substance abuse treatment centre? Details",
+          "need": "if_known"
+        }
+      ],
+      "validation_rules": [
+        "Weapons and fear for safety are always asked about, because they bear on the interim order."
+      ],
+      "legal_sources": [
+        "form",
+        "magistrates",
+        "guide"
+      ],
+      "next_step": "what_the_order_should_stop"
+    },
+    {
+      "step_id": "what_the_order_should_stop",
+      "form_section": 7,
+      "form_paragraphs": [
+        "Form 6, paragraph 6"
+      ],
+      "title": "What the order should stop",
+      "key_section": true,
+      "applies": "always",
+      "questions": {
+        "en": "What should the order stop the respondent from doing?",
+        "zu": "",
+        "af": ""
+      },
+      "fields": [
+        {
+          "id": "t_a",
+          "label": "(a) Not to commit or attempt to commit these acts towards the complainant",
+          "need": "if_relevant"
+        },
+        {
+          "id": "t_b",
+          "label": "(b) Not to get the help of another person to commit any of these acts",
+          "need": "if_relevant"
+        },
+        {
+          "id": "t_c",
+          "label": "(c) Not to enter the shared residence, situated at",
+          "need": "if_relevant"
+        },
+        {
+          "id": "t_d",
+          "label": "(d) Not to enter a specified part of the shared residence, namely",
+          "need": "if_relevant"
+        },
+        {
+          "id": "t_e",
+          "label": "(e) Not to enter the complainant's residence, situated at",
+          "need": "if_relevant"
+        },
+        {
+          "id": "t_f",
+          "label": "(f) Not to enter the complainant's workplace or place of studies, namely",
+          "need": "if_relevant"
+        },
+        {
+          "id": "t_g",
+          "label": "(g) Not to prevent the complainant or any child who lives or lived in the shared residence from entering or remaining in it",
+          "need": "if_relevant"
+        },
+        {
+          "id": "t_h",
+          "label": "(h) Not to disclose or make available any electronic communication, especially",
+          "need": "if_relevant"
+        },
+        {
+          "id": "t_i",
+          "label": "(i) Not to commit any other act, namely",
+          "need": "if_relevant"
+        }
+      ],
+      "validation_rules": [
+        "At least one of the protections (a) to (i) is chosen.",
+        "Protections are offered as the form's own tick list."
+      ],
+      "legal_sources": [
+        "form",
+        "language",
+        "magistrates"
+      ],
+      "next_step": "extra_conditions"
+    },
+    {
+      "step_id": "extra_conditions",
+      "form_section": 8,
+      "form_paragraphs": [
+        "Form 6, paragraph 7"
+      ],
+      "title": "Extra conditions",
+      "key_section": false,
+      "applies": "always",
+      "questions": {
+        "en": "Do you also need help with money, rent, maintenance, weapons, collecting belongings, or keeping your address secret?",
+        "zu": "",
+        "af": ""
+      },
+      "fields": [
+        {
+          "id": "o_a",
+          "label": "(a) A peace officer to accompany the complainant to collect personal property",
+          "need": "optional"
+        },
+        {
+          "id": "o_b",
+          "label": "(b) A member of SAPS to seize these weapons in the possession of the respondent",
+          "need": "if_relevant"
+        },
+        {
+          "id": "o_c",
+          "label": "(c) Respondent to pay interim rent or mortgage payments until the return date",
+          "need": "optional"
+        },
+        {
+          "id": "o_d",
+          "label": "(d) Respondent to pay interim maintenance until the return date",
+          "need": "optional"
+        },
+        {
+          "id": "o_e",
+          "label": "(e) Respondent to pay interim emergency monetary relief until the return date (food, transport, medical, counselling, school fees, relocation, household bills)",
+          "need": "optional"
+        },
+        {
+          "id": "o_f",
+          "label": "(f) Respondent refused any contact with these children until the return date",
+          "need": "optional"
+        },
+        {
+          "id": "o_g",
+          "label": "(g) Respondent granted this contact with the children until the return date",
+          "need": "optional"
+        },
+        {
+          "id": "o_h",
+          "label": "(h) The complainant's home, study or work details not to be disclosed to the respondent",
+          "need": "optional"
+        },
+        {
+          "id": "o_i",
+          "label": "(i) Other conditions requested",
+          "need": "optional"
+        }
+      ],
+      "validation_rules": [
+        "Money requests are offered as a tick list.",
+        "Keeping the address secret is a yes or no question."
+      ],
+      "legal_sources": [
+        "form",
+        "guide"
+      ],
+      "next_step": "personal_property"
+    },
+    {
+      "step_id": "personal_property",
+      "form_section": 9,
+      "form_paragraphs": [
+        "Form 6, paragraph 8"
+      ],
+      "title": "Personal property",
+      "key_section": false,
+      "applies": "only when the applicant needs to collect belongings",
+      "questions": {
+        "en": "Are there belongings you need to collect from the home, with a police officer?",
+        "zu": "",
+        "af": ""
+      },
+      "fields": [
+        {
+          "id": "property",
+          "label": "Property description, why it is your personal property, and the address where it is kept",
+          "need": "optional"
+        }
+      ],
+      "validation_rules": [],
+      "legal_sources": [
+        "form"
+      ],
+      "next_step": "court_and_documents"
+    },
+    {
+      "step_id": "court_and_documents",
+      "form_section": 10,
+      "form_paragraphs": [
+        "Form 6, paragraph 9",
+        "Form 6, paragraph 10",
+        "Form 6, paragraph 11"
+      ],
+      "title": "Police station, court and documents",
+      "key_section": false,
+      "applies": "always",
+      "questions": {
+        "en": "Which police station would you report to if the order is broken, and which court can you get to?",
+        "zu": "",
+        "af": ""
+      },
+      "fields": [
+        {
+          "id": "police_station",
+          "label": "I am likely to report a breach of the protection order at this police station",
+          "need": "required"
+        },
+        {
+          "id": "court",
+          "label": "The court I will be able to attend",
+          "need": "required"
+        },
+        {
+          "id": "annexures",
+          "label": "Documents I will attach (photos, medical records, screenshots, witness statements)",
+          "need": "optional"
+        }
+      ],
+      "validation_rules": [
+        "Evidence is never required to apply; documents are listed only if the applicant has them."
+      ],
+      "legal_sources": [
+        "form",
+        "evidence",
+        "guide"
+      ],
+      "next_step": null
+    }
+  ]
+}

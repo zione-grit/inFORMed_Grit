@@ -36,6 +36,7 @@ async function check(name, fn) {
   process.env.OPENAI_API_KEY = 'test';
   process.env.MODEL = process.env.MODEL || 'gpt-6.1-terra';
   delete process.env.DEMO_PASSCODE;
+  process.env.COUNTERS = 'memory'; // counts kept in memory so the checks can read them
   const server = require('../server');
   await new Promise(r => server.listen(0, r));
   const base = 'http://localhost:' + server.address().port;
@@ -104,6 +105,95 @@ async function check(name, fn) {
   });
   await check('an unknown tool falls back to the protection order tool', async () => {
     const r = await (await post('/api/chat', { tool: 'nope', messages: [{ role: 'user', content: 'He hit me' }], mode: 'fill' })).json(); assert.equal(r.fixed, false);
+  });
+  await check('Firebase set-up: Johannesburg function, website calls it directly, no always-on copy', async () => {
+    const fs = require('fs'), path = require('path'), up = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+    const cfg = JSON.parse(up('firebase.json'));
+    assert.ok(cfg.hosting.rewrites.some(r => r.source === '/form' && r.destination === '/index.html'));
+    assert.ok(!cfg.hosting.rewrites.some(r => r.function || r.run), 'Hosting cannot pass requests to Johannesburg');
+    const { api, SITES } = require('../index.js'), opt = api.__endpoint;
+    assert.deepEqual(opt.region, ['africa-south1']); assert.equal(opt.minInstances, 0); assert.equal(opt.maxInstances, 5);
+    assert.ok(SITES.includes('https://informed-grit.web.app'));
+    const cfgJs = up('public/config.js');
+    const apiFor = host => { const w = { location: { hostname: host } }; new Function('window', 'location', cfgJs)(w, w.location); return w.INFORMED_API; };
+    assert.equal(apiFor('informed-grit.web.app'), 'https://africa-south1-informed-grit.cloudfunctions.net/api');
+    assert.equal(apiFor('informed-grit-1a2b.firebaseapp.com'), 'https://africa-south1-informed-grit-1a2b.cloudfunctions.net/api');
+    const page = up('public/index.html');
+    assert.ok(!/fetch\('\/api\//.test(page) && !page.includes("return '/api/"), 'every request must go through API_BASE');
+    assert.match(await (await fetch(base + '/config.js')).text(), /INFORMED_API/);
+  });
+  await check('the Firebase function runs the same endpoints and refuses unknown ones', async () => {
+    const { handle } = require('../index.js');
+    const call = (path, body) => new Promise(resolve => {
+      const res = { headers: {}, code: 200, headersSent: false,
+        setHeader(k, v) { this.headers[k.toLowerCase()] = v; }, getHeader(k) { return this.headers[k.toLowerCase()]; },
+        status(c) { this.code = c; return this; }, json(o) { resolve({ code: this.code, body: o, headers: this.headers }); return this; },
+        send(b) { resolve({ code: this.code, body: b, headers: this.headers }); return this; }, end(b) { resolve({ code: this.code, body: b, headers: this.headers }); return this; } };
+      handle({ method: 'POST', path, headers: {}, query: {}, body }, res);
+    });
+    const ok = await call('/api/chat', { tool: 'protection-order', messages: [{ role: 'user', content: 'I am in danger' }], mode: 'fill' });
+    assert.equal(ok.code, 200); assert.equal(ok.body.fixed, true); assert.equal(ok.headers['x-frame-options'], 'DENY');
+    assert.equal((await call('/api/nope', {})).code, 404); assert.equal((await call('/server.js', {})).code, 404);
+  });
+
+  await check('legal sources: every record is complete, and only approved ones reach the AI', async () => {
+    const { loadRecords, checkRecord, approved } = require('../lib/core/knowledge');
+    const path = require('path');
+    const recs = loadRecords(path.join(__dirname, '../lib/tools/protection-order/sources'));
+    assert.ok(recs.length >= 6);
+    const t = require('../lib/tools').get('protection-order');
+    assert.deepEqual(t.knowledgeDocs.map(d => d.id).sort(), approved(recs).map(r => r.document_id).sort());
+    const draft = { ...recs[0], document_id: 'x', approval_status: 'draft' };
+    assert.equal(approved([draft]).length, 0, 'a draft is never used');
+    assert.ok(checkRecord({ ...recs[0], approval_status: 'superseded', superseded_by: '' }).length, 'a superseded record must say what replaced it');
+    assert.ok(checkRecord({ ...recs[0], review_date: '16/11/2026' }).length, 'dates are YYYY-MM-DD');
+    const instr = require('../lib/tools/protection-order/rules').instructions({ lang: 'auto', channel: 'web', form: {}, abuse: [], mode: 'fill' });
+    for (const r of approved(recs)) assert.ok(instr.includes(`### DOCUMENT [${r.document_id}]`));
+  });
+  await check('workflow: every form field is in exactly one step, and every step links to approved sources', async () => {
+    const t = require('../lib/tools').get('protection-order'), wf = t.workflow;
+    const { FIELDS } = require('../public/fields.js');
+    const placed = wf.steps.flatMap(s => s.fields.map(f => f.id));
+    assert.equal(placed.length, new Set(placed).size, 'a field is in two steps');
+    assert.deepEqual([...placed].sort(), FIELDS.map(f => f.id).sort());
+    const ok = new Set(t.knowledgeDocs.map(d => d.id)), ids = new Set(wf.steps.map(s => s.step_id));
+    for (const s of wf.steps) {
+      for (const id of s.legal_sources) assert.ok(ok.has(id), `${s.step_id} uses ${id}, which is not an approved source`);
+      assert.ok(s.next_step === null || ids.has(s.next_step), `${s.step_id} goes to an unknown step`);
+      for (const f of s.fields) assert.ok(Object.keys(wf.field_needs).includes(f.need), `${f.id} has an unknown level`);
+      assert.ok(s.questions.en);
+      const official = [...new Set(FIELDS.filter(f => f.s === s.form_section).map(f => `Form ${f.doc}, paragraph ${f.ds}`))];
+      assert.deepEqual(s.form_paragraphs, official, `${s.step_id} names the wrong paragraphs of the official form`);
+    }
+  });
+  await check('review page and website sources list are up to date (run npm run review if not)', async () => {
+    const fs = require('fs'), path = require('path'), { page, docsJson } = require('../scripts/review');
+    // Windows may keep these files with its own line endings; only the words are compared.
+    const read = f => fs.readFileSync(path.join(__dirname, f), 'utf8').replace(/\r\n/g, '\n');
+    assert.equal(read('../review/protection-order.md'), page('protection-order'));
+    assert.equal(read('../public/docs.json'), docsJson('protection-order'));
+  });
+  await check('usage counters hold labels only, never what people wrote', async () => {
+    const counters = require('../lib/core/counters');
+    counters.memory.clear();
+    await post('/api/chat', { tool: 'protection-order', messages: [{ role: 'user', content: 'My name is Thandi Zulu and he hit me at 12 Main Road' }], form: {}, lang: 'zu', mode: 'fill' });
+    await post('/api/document', { tool: 'protection-order', form: { c_names: 'Thandi' }, abuse: [], format: 'pdf' });
+    const keys = [...counters.memory.keys()];
+    assert.ok(keys.includes('turn|protection-order|web|zu|fill|text|reply|s5'), keys.join(', '));
+    assert.ok(keys.includes('document|protection-order|pdf'));
+    for (const k of keys) assert.ok(!/thandi|zulu|main|road|hit/i.test(k), 'content leaked into a counter: ' + k);
+    assert.equal(counters.key('turn', { channel: 'Thandi', lang: '<script>' }).includes('Thandi'), false, 'unknown labels become "other"');
+  });
+  await check('a counter that cannot be saved never delays or breaks a reply', async () => {
+    process.env.COUNTERS = 'firestore'; // no Firebase here, so saving fails
+    await require('../lib/core/counters').count('listen', { lang: 'en' }); // the first count loads Firebase's code; that happens once per running copy
+    const t0 = Date.now();
+    const r = await (await post('/api/chat', { tool: 'protection-order', messages: [{ role: 'user', content: 'I am in danger' }], mode: 'fill' })).json();
+    assert.equal(r.fixed, true); assert.ok(Date.now() - t0 < 400, 'an emergency reply waited for its count: ' + (Date.now() - t0) + ' ms');
+    const t1 = Date.now();
+    const n = await (await post('/api/chat', { tool: 'protection-order', messages: [{ role: 'user', content: 'He hit me' }], mode: 'fill' })).json();
+    process.env.COUNTERS = 'memory';
+    assert.equal(n.fixed, false); assert.ok(n.reply); assert.ok(Date.now() - t1 < 3000, 'took ' + (Date.now() - t1) + ' ms');
   });
 
   server.close(); mock.close();

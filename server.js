@@ -1,6 +1,6 @@
-// Runs inFORMed as one small web server, for Google Cloud Run (or any computer with Node).
-// It serves the website from public/ and runs the same api/*.js handlers that Vercel runs,
-// so the code is identical on both. Start it with: node server.js
+// Runs inFORMed as one small web server on your own computer, and for the automatic checks (npm test).
+// It serves the website from public/ and runs the same api/*.js handlers that the Firebase function
+// runs (index.js), so the code is identical on both. Start it with: node server.js
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -9,7 +9,7 @@ const PORT = Number(process.env.PORT || 8080);
 const PUBLIC = path.join(__dirname, 'public');
 const MAX_BODY = 6 * 1024 * 1024; // voice recordings arrive as text and can be a few megabytes
 
-// The same security headers as vercel.json.
+// The same security headers as firebase.json.
 const SECURITY = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY' };
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -22,7 +22,7 @@ const PAGES = { '/': 'index.html', '/form': 'index.html' }; // /form opens strai
 const API = {};
 for (const f of fs.readdirSync(path.join(__dirname, 'api'))) if (f.endsWith('.js')) API[f.slice(0, -3)] = require('./api/' + f);
 
-// Gives Node's request and response the small helpers the Vercel handlers use.
+// Gives Node's request and response the small helpers the handlers use (Firebase provides the same ones).
 function helpers(req, res, url) {
   req.query = Object.fromEntries(url.searchParams);
   res.status = code => { res.statusCode = code; return res; };
