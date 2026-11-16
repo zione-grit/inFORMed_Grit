@@ -2,7 +2,7 @@
   "functions": {
     "api/*.js": {
       "maxDuration": 60,
-      "includeFiles": "lib/forms/**"
+      "includeFiles": "lib/tools/**/forms/**"
     }
   },
   "headers": [

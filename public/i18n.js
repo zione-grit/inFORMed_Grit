@@ -9,15 +9,13 @@
   const en = {
     _status: 'final',
     // header
-    langAuto: 'Match my language', quickExit: 'Quick exit', quickExitTitle: 'Leave this site immediately',
-    tgTitle: 'Chat with inFORMed on Telegram', langTitle: 'Language',
+    langAuto: 'Match my language', quickExit: 'Quick exit', quickExitTitle: 'Leave this site immediately', langTitle: 'Language',
     // home
     eyebrow: 'Protection order support · South Africa',
     h1: "Fill in your <em>protection order</em> form, with help.",
     lede: "Tell us what happened by talking or typing. We fill in the court form with you, one question at a time. It is free and private.",
     askTitle: 'Ask a question', askDesc: 'Understand protection orders, the court process and the legal words.', askGo: 'Start a conversation →',
-    fillTitle: 'Help me fill in my form', fillDesc: 'Tell your story by typing or speaking. Your application fills in as you talk.', fillGo: 'Start my application →',
-    tgBig: 'Chat on Telegram', openSaved: 'Continue a saved application', demo: 'Watch a demo',
+    fillTitle: 'Help me fill in my form', fillDesc: 'Tell your story by typing or speaking. Your application fills in as you talk.', fillGo: 'Start my application →', openSaved: 'Continue a saved application', demo: 'Watch a demo',
     re1: 'One gentle question at a time', re2: 'Pause whenever you need', re3: 'You decide what happens next',
     pv1: 'Thank you for sharing that. When did this happen, if you remember?', pv2: 'Friday night, the 2nd. Around 11.', pv3: 'Thank you, that detail really helps the court. Were you hurt?',
     howH: 'How it works',
@@ -201,14 +199,12 @@
   // DRAFT: to be checked by GRIT's isiZulu speakers.
   const zu = {
     _status: 'draft',
-    langAuto: 'Ulimi lwami', quickExit: 'Phuma ngokushesha', quickExitTitle: 'Shiya le sayithi manje',
-    tgTitle: 'Xoxa no-inFORMed ku-Telegram', langTitle: 'Ulimi',
+    langAuto: 'Ulimi lwami', quickExit: 'Phuma ngokushesha', quickExitTitle: 'Shiya le sayithi manje', langTitle: 'Ulimi',
     eyebrow: 'Usizo ngomyalelo wokuvikela · eNingizimu Afrika',
     h1: "Gcwalisa ifomu lakho <em>lomyalelo wokuvikela</em>, ngosizo.",
     lede: "Sitshele okwenzekile ngokukhuluma noma ngokubhala. Sigcwalisa ifomu lasenkantolo nawe, umbuzo owodwa ngesikhathi. Kumahhala futhi kuyimfihlo.",
     askTitle: 'Buza umbuzo', askDesc: 'Qonda imiyalelo yokuvikela, inqubo yasenkantolo namagama asemthethweni.', askGo: 'Qala ingxoxo →',
-    fillTitle: 'Ngisize ngigcwalise ifomu lami', fillDesc: 'Xoxa indaba yakho ngokubhala noma ngokukhuluma. Isicelo sakho sigcwaliswa njengoba ukhuluma.', fillGo: 'Qala isicelo sami →',
-    tgBig: 'Xoxa ku-Telegram', openSaved: 'Qhubeka nesicelo esigciniwe', demo: 'Buka umboniso',
+    fillTitle: 'Ngisize ngigcwalise ifomu lami', fillDesc: 'Xoxa indaba yakho ngokubhala noma ngokukhuluma. Isicelo sakho sigcwaliswa njengoba ukhuluma.', fillGo: 'Qala isicelo sami →', openSaved: 'Qhubeka nesicelo esigciniwe', demo: 'Buka umboniso',
     re1: 'Umbuzo owodwa omnene ngesikhathi', re2: 'Phumula noma nini uma udinga', re3: 'Nguwe onquma okulandelayo',
     pv1: 'Ngiyabonga ngokwabelana lokho. Kwenzeka nini, uma ukhumbula?', pv2: 'NgoLwesihlanu ebusuku, mhla zi-2. Cishe ngo-11.', pv3: 'Ngiyabonga, lowo mniningwane usiza kakhulu inkantolo. Ingabe walimala?',
     howH: 'Kusebenza kanjani',
@@ -387,14 +383,12 @@
   // DRAFT: to be checked by GRIT's Afrikaans speakers.
   const af = {
     _status: 'draft',
-    langAuto: 'My taal', quickExit: 'Gaan vinnig uit', quickExitTitle: 'Verlaat hierdie webwerf dadelik',
-    tgTitle: 'Gesels met inFORMed op Telegram', langTitle: 'Taal',
+    langAuto: 'My taal', quickExit: 'Gaan vinnig uit', quickExitTitle: 'Verlaat hierdie webwerf dadelik', langTitle: 'Taal',
     eyebrow: 'Hulp met beskermingsbevele · Suid-Afrika',
     h1: "Vul jou <em>beskermingsbevel</em>-vorm in, met hulp.",
     lede: "Vertel ons wat gebeur het deur te praat of te tik. Ons vul die hofvorm saam met jou in, een vraag op ’n slag. Dit is gratis en privaat.",
     askTitle: '’n Vraag vra', askDesc: 'Verstaan beskermingsbevele, die hofproses en die regswoorde.', askGo: 'Begin ’n gesprek →',
-    fillTitle: 'Help my om my vorm in te vul', fillDesc: 'Vertel jou storie deur te tik of te praat. Jou aansoek word ingevul terwyl jy praat.', fillGo: 'Begin my aansoek →',
-    tgBig: 'Gesels op Telegram', openSaved: 'Gaan voort met ’n gestoorde aansoek', demo: 'Kyk na ’n demonstrasie',
+    fillTitle: 'Help my om my vorm in te vul', fillDesc: 'Vertel jou storie deur te tik of te praat. Jou aansoek word ingevul terwyl jy praat.', fillGo: 'Begin my aansoek →', openSaved: 'Gaan voort met ’n gestoorde aansoek', demo: 'Kyk na ’n demonstrasie',
     re1: 'Een sagte vraag op ’n slag', re2: 'Rus wanneer jy wil', re3: 'Jy besluit wat volgende gebeur',
     pv1: 'Dankie dat jy dit gedeel het. Wanneer het dit gebeur, as jy onthou?', pv2: 'Vrydagaand, die 2de. Omtrent 11-uur.', pv3: 'Dankie, daardie besonderheid help die hof regtig. Was jy beseer?',
     howH: 'Hoe dit werk',

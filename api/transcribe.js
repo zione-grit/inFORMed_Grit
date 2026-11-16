@@ -1,6 +1,6 @@
 // Turns a voice recording into text. The audio is sent to OpenAI and not kept.
-const { transcribe } = require('../lib/voice');
-const { overLimit, LIMIT_REPLY, ip, codeOk } = require('../lib/guard');
+const { transcribe } = require('../lib/core/voice');
+const { overLimit, LIMIT_REPLY, ip, codeOk } = require('../lib/core/guard');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only.' });

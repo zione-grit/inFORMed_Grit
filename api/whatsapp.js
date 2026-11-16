@@ -1,9 +1,9 @@
 // WhatsApp Cloud API webhook (Meta). See README for setup with Meta's free test number.
-const { waitUntil } = require('@vercel/functions');
-const { handle } = require('../lib/bot');
-const { toOfficialPdf, toDocx } = require('../lib/render');
-const store = require('../lib/store');
-const { transcribe } = require('../lib/voice');
+const { later } = require('../lib/core/background');
+const { handle } = require('../lib/core/bot');
+const store = require('../lib/core/store');
+const { transcribe } = require('../lib/core/voice');
+const tools = require('../lib/tools');
 
 const GRAPH = 'https://graph.facebook.com/v21.0';
 const PHONE_ID = () => process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -24,8 +24,9 @@ async function sendText(to, text, buttons) {
 async function sendDoc(to, format, s) {
   const isWord = format === 'docx';
   const mime = isWord ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf';
-  const name = `protection-order-draft.${isWord ? 'docx' : 'pdf'}`;
-  const buf = isWord ? await toDocx(s.form, s.abuse) : await toOfficialPdf(s.form, s.abuse);
+  const tool = tools.get(s.tool);
+  const name = tool.documents.fileName(format, true);
+  const buf = isWord ? await tool.documents.docx(s.form, s.abuse) : await tool.documents.pdf(s.form, s.abuse);
   const fd = new FormData();
   fd.append('messaging_product', 'whatsapp');
   fd.append('type', mime);
@@ -75,6 +76,6 @@ module.exports = async (req, res) => {
   }
   if (req.method !== 'POST') return res.status(405).send('POST only');
   if (!process.env.WHATSAPP_TOKEN || !PHONE_ID()) return res.status(200).send('not configured');
-  waitUntil(process_(req.body || {}).catch(e => console.error('WhatsApp handler error:', e.message)));
+  await later(process_(req.body || {}).catch(e => console.error('WhatsApp handler error:', e.message)));
   return res.status(200).send('ok');
 };
