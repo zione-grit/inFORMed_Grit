@@ -110,6 +110,7 @@ async function check(name, fn) {
     await say('hi'); await say('English'); await say('Fill in my form'); await say('He hit me');
     const list = (await say('please protect me')).map(o => o.text).join(' '); assert.match(list, /1\. /);
     await say('1, 3'); const doc = await say('PDF'); assert.ok(doc.some(o => o.doc === 'pdf'));
+    const nextMsg = doc.find(o => o.text && /What to do next/.test(o.text)); assert.ok(nextMsg, 'what to do next comes with the document'); assert.match(nextMsg.text, /Still empty on the form:/); assert.match(nextMsg.text, /your clinic card/i); assert.match(nextMsg.text, /someone else uses this phone/); assert.match(nextMsg.text, /send DELETE/);
     const del = await say('DELETE'); assert.match(del[0].text, /deleted/);
   });
   await check('an unknown tool falls back to the protection order tool', async () => {
@@ -334,6 +335,22 @@ async function check(name, fn) {
     assert.equal(rows.length, 2);
     assert.deepEqual([rows[0].event, rows[0].format, rows[0].province, rows[0].count], ['document', 'pdf', 'GP', 4]);
     assert.match(u.csv(rows), /^day,event,tool,/);
+  });
+
+  await check('WhatsApp: commands work in the person\'s language, and the English ones still do', async () => {
+    const fs = require('fs'), os = require('os'), path = require('path');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cmd-')); process.env.I18N_DIR = dir;
+    const i18n = require('../lib/core/i18n'), bot = require('../lib/core/bot');
+    const en = 'ask|fill|form|pdf|word|language|delete';
+    fs.writeFileSync(path.join(dir, 'xh.json'), JSON.stringify({ language: 'xh', strings: { 'wa.cmds': 'buza|gcwalisa|ifom|pdf|word|ulwimi|cima' }, status: {}, from: { 'wa.cmds': i18n.hash(en) } })); i18n._clear();
+    assert.equal(bot.command('IFOM', 'xh'), 'form'); assert.equal(bot.command('gcwalisa', 'xh'), 'fill'); assert.equal(bot.command('Cima', 'xh'), 'delete');
+    assert.equal(bot.command('form', 'xh'), 'form', 'the English word still works');
+    assert.equal(bot.command('ifom', 'en'), null, 'another language\'s word is not a command in English');
+    assert.match(bot.help(require('../lib/tools').get('protection-order'), 'xh'), /^[^]*CIMA to /m);
+    // A translation with the wrong number of words is ignored.
+    fs.writeFileSync(path.join(dir, 'xh.json'), JSON.stringify({ language: 'xh', strings: { 'wa.cmds': 'buza|gcwalisa' }, status: {}, from: { 'wa.cmds': i18n.hash(en) } })); i18n._clear();
+    assert.equal(bot.command('gcwalisa', 'xh'), null); assert.equal(bot.command('fill', 'xh'), 'fill');
+    delete process.env.I18N_DIR; i18n._clear();
   });
 
   server.close(); mock.close();

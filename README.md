@@ -212,7 +212,9 @@ Notes:
 5. Meta app → **WhatsApp → Configuration → Webhook → Edit**: Callback URL `https://YOUR-ADDRESS/api/whatsapp`, the same verify token, then subscribe to **messages**.
 6. From your verified phone, send "hi" to the test number. It asks for your language (and the access code first, if you set one).
 
-Words the WhatsApp bot understands: `ASK`, `FILL`, `FORM`, `PDF`, `WORD`, `LANGUAGE`, `DELETE`, `HELP`. Voice notes work too.
+Words the WhatsApp bot understands: `ASK`, `FILL`, `FORM`, `PDF`, `WORD`, `LANGUAGE`, `DELETE`, `HELP`. Voice notes work too. The same words work in the person's language (the translated `wa.cmds` in `public/i18n/<code>.json`, seven words in this order: ask, fill, form, pdf, word, language, delete), shown in the help message in that language. The English words always work, so nobody is locked out.
+
+With every document, inFORMed sends a "what to do next" message: take it to the clerk (who can help print it), bring ID and supporting documents, which required fields are still empty, the things to bring, and a note that the document is now in WhatsApp on that phone and should be deleted from the chat if the phone is shared. Reading answers aloud on WhatsApp is not built; it is on the list for later.
 
 ## The form
 
