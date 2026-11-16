@@ -145,7 +145,7 @@
     iP6: "Call the police on 10111 or the GBV Command Centre on 0800 428 428. Both are free. You can also use the GRIT app, which has a panic button that connects you to help.",
     iClose: "Close",
     fillStart: "Tell me what is happening. You can type or talk.\n\nFor example: “My ex keeps threatening me. I want him to stay away.”",
-    startBtn: "Start",
+    startBtn: "I understand, start",
     // tick lists, support and things to bring
     ch_protections_stop: "Stop hurting, threatening or controlling me",
     ch_protections_others: "Not ask other people to do it for him",
@@ -329,7 +329,7 @@
     iP6: "Shayela amaphoyisa ku-10111 noma i-GBV Command Centre ku-0800 428 428. Zombili zimahhala. Ungasebenzisa ne-app ye-GRIT, enenkinobho yokuphuthuma ekuxhumanisa nosizo.",
     iClose: "Vala",
     fillStart: "Ngitshele ukuthi kwenzekani. Ungabhala noma ukhulume.\n\nIsibonelo: “Owayeyisoka lami uhlala engisongela. Ngifuna ahlale kude nami.”",
-    startBtn: "Qala",
+    startBtn: "Ngiyaqonda, qala",
     // tick lists, support and things to bring
     ch_protections_stop: "Ayeke ukungilimaza, ukungisabisa noma ukungilawula",
     ch_protections_others: "Angacela abanye abantu ukuthi bakwenze esikhundleni sakhe",
@@ -512,7 +512,7 @@
     iP6: "Bel die polisie by 10111 of die GBV Command Centre by 0800 428 428. Albei is gratis. Jy kan ook die GRIT-toep gebruik, wat ’n paniekknoppie het wat jou met hulp verbind.",
     iClose: "Maak toe",
     fillStart: "Vertel my wat aan die gebeur is. Jy kan tik of praat.\n\nByvoorbeeld: “My eks dreig my aanhoudend. Ek wil hê hy moet wegbly.”",
-    startBtn: "Begin",
+    startBtn: "Ek verstaan, begin",
     // tick lists, support and things to bring
     ch_protections_stop: "Ophou om my seer te maak, te dreig of te beheer",
     ch_protections_others: "Nie ander mense vra om dit vir hom te doen nie",

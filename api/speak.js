@@ -1,18 +1,15 @@
-// Reads a reply aloud (only when the person taps "Listen").
-// GET /api/speak?t=<base64url text>&l=<lang>  — returns MP3. The page asks for one sentence at a time, so playback starts quickly.
+// Reads a reply aloud (only when the person taps "Listen" or turns on "Read aloud").
+// POST /api/speak { text, lang } with the access code in x-demo-code; returns MP3. The page asks for one
+// sentence or so at a time, so playback starts quickly. The text is only ever in the request body, never
+// in the web address, so it is not kept in server logs.
 const { speakStream } = require('../lib/core/voice');
 const { overLimit, ip, codeOk } = require('../lib/core/guard');
 const counters = require('../lib/core/counters');
 
-function fromB64url(s) {
-  return Buffer.from(String(s || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
-}
-
 module.exports = async (req, res) => {
-  const q = req.query || {};
-  const text = req.method === 'GET' ? fromB64url(q.t) : (req.body || {}).text;
-  const lang = req.method === 'GET' ? q.l : (req.body || {}).lang;
-  const code = req.method === 'GET' ? q.c : req.headers['x-demo-code'];
+  if (req.method !== 'POST') return res.status(405).send('POST only.');
+  const { text, lang } = req.body || {};
+  const code = req.headers['x-demo-code'];
   if (!codeOk(code)) return res.status(401).send('Wrong or missing access code.');
   if (!text) return res.status(400).send('No text.');
   // Listening has its own, generous limit and does not count towards the message limits.
@@ -23,6 +20,7 @@ module.exports = async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.statusCode = 200;
     await counters.count('listen', { lang });
+    await counters.count('listen_chars', { lang }, { n: String(text).length });
     if (upstream.mp3) { res.setHeader('Content-Length', upstream.mp3.length); return res.end(upstream.mp3); }
     const reader = upstream.body.getReader();
     for (;;) {

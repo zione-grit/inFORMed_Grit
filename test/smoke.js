@@ -19,11 +19,18 @@ const mock = http.createServer((req, res) => {
       const last = [...j.input].reverse().find(m => m.role === 'user').content;
       out = { reply: 'Thank you for telling me.', updates: [{ field: 'history', value: last }], abuse_types: ['physical'], sources: [], grounding: 'none',
         safety: /coming now/.test(last) ? 'immediate_danger' : 'none', ready: false, language: /ngi/i.test(last) ? 'zu' : 'en',
-        distress: /scared/.test(last), offer: /protect/.test(last) ? 'protections' : 'none', offer_first: [], bring: ['Your clinic card'] };
+        distress: /scared/.test(last), offer: /protect/.test(last) ? 'protections' : 'none', offer_first: [], bring: ['Your clinic card'],
+        province: /durban/i.test(last) ? 'KZN' : 'unknown' };
     }
-    res.end(JSON.stringify({ output_text: JSON.stringify(out) }));
+    res.end(JSON.stringify({ output_text: JSON.stringify(out), usage: { input_tokens: 1200, input_tokens_details: { cached_tokens: 1000 }, output_tokens: 80 } }));
   });
 });
+
+// Some checks fail on purpose (a counter with no database, a WhatsApp message with a bad signature).
+// The warnings those print are expected, so they are hidden here; any other warning still shows.
+const realError = console.error;
+const EXPECTED = /Counter not saved|WhatsApp: message refused|Unable to detect a Project Id|To learn more about authentication|cloud\.google\.com\/docs\/authentication/;
+console.error = (...a) => { if (!EXPECTED.test(a.map(String).join(' '))) realError(...a); };
 
 const results = [];
 async function check(name, fn) {
@@ -179,8 +186,9 @@ async function check(name, fn) {
     await post('/api/chat', { tool: 'protection-order', messages: [{ role: 'user', content: 'My name is Thandi Zulu and he hit me at 12 Main Road' }], form: {}, lang: 'zu', mode: 'fill' });
     await post('/api/document', { tool: 'protection-order', form: { c_names: 'Thandi' }, abuse: [], format: 'pdf' });
     const keys = [...counters.memory.keys()];
-    assert.ok(keys.includes('turn|protection-order|web|zu|fill|text|reply|s5'), keys.join(', '));
-    assert.ok(keys.includes('document|protection-order|pdf'));
+    assert.ok(keys.includes('turn|protection-order|web|zu|en|fill|text|reply|s5|unknown'), keys.join(', '));
+    assert.ok(keys.includes('form_started|protection-order|web|zu'), 'a new form is counted as started');
+    assert.ok(keys.includes('document|protection-order|pdf|unknown'));
     for (const k of keys) assert.ok(!/thandi|zulu|main|road|hit/i.test(k), 'content leaked into a counter: ' + k);
     assert.equal(counters.key('turn', { channel: 'Thandi', lang: '<script>' }).includes('Thandi'), false, 'unknown labels become "other"');
   });
@@ -194,6 +202,57 @@ async function check(name, fn) {
     const n = await (await post('/api/chat', { tool: 'protection-order', messages: [{ role: 'user', content: 'He hit me' }], mode: 'fill' })).json();
     process.env.COUNTERS = 'memory';
     assert.equal(n.fixed, false); assert.ok(n.reply); assert.ok(Date.now() - t1 < 3000, 'took ' + (Date.now() - t1) + ' ms');
+  });
+
+  await check('counters: province only from what the person named, AI cost in tokens, nothing counted for demo documents', async () => {
+    const counters = require('../lib/core/counters');
+    counters.memory.clear();
+    await post('/api/chat', { tool: 'protection-order', messages: [{ role: 'user', content: 'He hit me in Durban' }], form: { c_names: 'T' }, lang: 'en', mode: 'fill' });
+    await new Promise(r => setTimeout(r, 50)); // token counts are saved without holding up the reply
+    const keys = [...counters.memory.keys()];
+    assert.ok(keys.some(k => k.startsWith('turn|') && k.endsWith('|KZN')), keys.join(', '));
+    assert.ok(!keys.some(k => k.startsWith('form_started')), 'a form that was already started is not counted again');
+    assert.equal(counters.memory.get('tokens|' + process.env.MODEL + '|input'), 200);
+    assert.equal(counters.memory.get('tokens|' + process.env.MODEL + '|cached'), 1000);
+    assert.equal(counters.memory.get('tokens|' + process.env.MODEL + '|output'), 80);
+    counters.memory.clear();
+    await post('/api/document', { tool: 'protection-order', form: { c_names: 'T' }, abuse: [], format: 'pdf', demo: true });
+    assert.equal([...counters.memory.keys()].length, 0);
+  });
+  await check('fill mode follows the approved workflow; ask mode does not get it', async () => {
+    const wf = require('../lib/tools/protection-order/workflow.json');
+    const r = require('../lib/tools/protection-order/rules');
+    const fill = r.instructions({ lang: 'auto', channel: 'web', form: {}, abuse: [], mode: 'fill' });
+    for (const st of wf.steps) assert.ok(fill.includes(`STEP ${st.form_section}: ${st.title}.`), st.title);
+    for (const rule of wf.statement_rules) assert.ok(fill.includes(rule));
+    assert.ok(!r.instructions({ lang: 'auto', channel: 'web', form: {}, abuse: [], mode: 'ask' }).includes('APPLICATION WORKFLOW'));
+    assert.ok(r.SCHEMA.required.includes('province'));
+  });
+  await check('reading aloud: the text is never in the web address', async () => {
+    assert.equal((await fetch(base + '/api/speak?t=SGVsbG8&l=en')).status, 405);
+    assert.ok(!require('fs').readFileSync(require('path').join(__dirname, '../public/index.html'), 'utf8').includes('/api/speak?'));
+  });
+  await check('WhatsApp: a message without Meta\'s signature is refused, a signed one is accepted', async () => {
+    const crypto = require('crypto');
+    Object.assign(process.env, { WHATSAPP_TOKEN: 't', WHATSAPP_PHONE_NUMBER_ID: '1', WHATSAPP_APP_SECRET: 'app-secret' });
+    const body = JSON.stringify({ entry: [] });
+    const send = sig => fetch(base + '/api/whatsapp', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(sig ? { 'x-hub-signature-256': sig } : {}) }, body });
+    assert.equal((await send()).status, 401);
+    assert.equal((await send('sha256=' + 'a'.repeat(64))).status, 401);
+    assert.equal((await send('sha256=' + crypto.createHmac('sha256', 'app-secret').update(body).digest('hex'))).status, 200);
+    for (const k of ['WHATSAPP_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_APP_SECRET']) delete process.env[k];
+  });
+  await check('limits: on Firebase only the address Google adds is trusted', async () => {
+    const { ip } = require('../lib/core/guard');
+    const req = { headers: { 'x-forwarded-for': '1.1.1.1, 9.9.9.9' } };
+    assert.equal(ip(req), '1.1.1.1');
+    process.env.K_SERVICE = 'api'; const was = console.log; console.log = () => {};
+    try { assert.equal(ip(req), '9.9.9.9'); } finally { delete process.env.K_SERVICE; console.log = was; }
+  });
+  await check('stored keys never contain a phone number or address', async () => {
+    const { docId } = require('../lib/core/db');
+    const id = docId('chat:whatsapp:27821234567');
+    assert.match(id, /^[0-9a-f]{40}$/); assert.ok(!id.includes('2782'));
   });
 
   server.close(); mock.close();

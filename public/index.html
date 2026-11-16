@@ -1635,6 +1635,7 @@ function readyNote(){
 function applyResult(j, flash = true){
   (j.updates || []).forEach((u, i) => setTimeout(() => setField(u.field, u.value, flash), i * 180));
   if (Array.isArray(j.abuse_types)) { S.abuse = j.abuse_types; renderTypes(); }
+  if (j.province && j.province !== 'unknown') S.province = j.province; // province only, for the usage counts
   if ((j.updates || []).length){ const p=$('formPill'); p.classList.remove('bump'); void p.offsetWidth; p.classList.add('bump'); }
   setTimeout(refreshProgress, ((j.updates||[]).length) * 180 + 50);
   if (j.ready) setTimeout(readyNote, 600);
@@ -1859,7 +1860,6 @@ function stopAudio(){
   AUDIO = null;
   if (AUDIO_BTN){ AUDIO_BTN.classList.remove('playing'); btnLabel(AUDIO_BTN, AUDIO_BTN.dataset.k || 'listen'); AUDIO_BTN = null; }
 }
-function b64url(str){ const bytes = new TextEncoder().encode(str); let bin = ''; bytes.forEach(b => bin += String.fromCharCode(b)); return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
 function speechChunks(text, max = 14){
   const parts = String(text).replace(/[\u2714\u2713\u2715]/g, '').replace(/\s+/g, ' ').trim().match(/[^.!?…]+[.!?…]+["'’”)\]]*\s*|[^.!?…]+$/g) || [String(text)];
   const out = []; let cur = '';
@@ -1872,7 +1872,13 @@ function speechChunks(text, max = 14){
   if (cur.trim()) out.push(cur.trim());
   return out.slice(0, max);
 }
-function speakUrl(x){ return API_BASE + '/api/speak?t=' + b64url(x.slice(0, 1800)) + '&l=' + encodeURIComponent(LANG === 'auto' ? UI : LANG) + (CODE ? '&c=' + encodeURIComponent(CODE) : ''); }
+// The text to read is sent in the request body, never in the web address, so it is not kept in server logs.
+function speakAudio(x){
+  return fetch(API_BASE + '/api/speak', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(CODE ? { 'x-demo-code': CODE } : {}) },
+    body: JSON.stringify({ text: x.slice(0, 1800), lang: LANG === 'auto' ? UI : LANG }) })
+    .then(r => { if (!r.ok) throw new Error('speak ' + r.status); return r.blob(); })
+    .then(b => URL.createObjectURL(b));
+}
 function listen(text, btn, auto, opts = {}){
   if (AUDIO_BTN === btn){ stopAudio(); return; }
   stopAudio();
@@ -1880,15 +1886,19 @@ function listen(text, btn, auto, opts = {}){
   if (V.state === 'recording' || V.state === 'starting') stopRecording(true);
   const gen = PGEN, parts = speechChunks(String(text).slice(0, opts.long ? 30000 : 5000), opts.long ? 80 : 14), loaded = [];
   AUDIO_BTN = btn; btn.classList.add('playing'); btnLabel(btn, 'listenLoad');
-  const load = i => { const a = PLAYERS[i % 2]; a.preload = 'auto'; a.src = speakUrl(parts[i]); loaded[i] = true; return a; };
+  // Each piece is fetched once; the next one is fetched while the current one plays.
+  const load = i => loaded[i] || (loaded[i] = speakAudio(parts[i]));
   const fail = () => { if (gen !== PGEN) return; const b = btn; stopAudio(); if (!auto){ btnLabel(b, 'listenFail'); setTimeout(() => btnLabel(b, b.dataset.k || 'listen'), 2500); } };
   const play = i => {
     if (gen !== PGEN) return;
-    const a = loaded[i] ? PLAYERS[i % 2] : load(i); AUDIO = a;
-    a.onplaying = () => { if (gen !== PGEN) return; btnLabel(btn, 'listenStop'); if (i + 1 < parts.length && !loaded[i + 1]) load(i + 1); };
-    a.onended = () => { if (gen !== PGEN) return; if (i + 1 < parts.length) play(i + 1); else { stopAudio(); if (RA && S.mode === 'live' && btn.classList.contains('chip')) $('mic').classList.add('invite'); } };
-    a.onerror = fail;
-    const p = a.play(); if (p) p.catch(e => { if (e && e.name === 'NotAllowedError') fail(); });
+    load(i).then(url => {
+      if (gen !== PGEN) { URL.revokeObjectURL(url); return; }
+      const a = PLAYERS[i % 2]; AUDIO = a; a.preload = 'auto'; a.src = url;
+      a.onplaying = () => { if (gen !== PGEN) return; btnLabel(btn, 'listenStop'); if (i + 1 < parts.length) load(i + 1).catch(() => {}); };
+      a.onended = () => { URL.revokeObjectURL(url); if (gen !== PGEN) return; if (i + 1 < parts.length) play(i + 1); else { stopAudio(); if (RA && S.mode === 'live' && btn.classList.contains('chip')) $('mic').classList.add('invite'); } };
+      a.onerror = fail;
+      const p = a.play(); if (p) p.catch(e => { if (e && e.name === 'NotAllowedError') fail(); });
+    }).catch(fail);
   };
   play(0);
 }
@@ -2163,7 +2173,7 @@ async function printForm(btn){
   const tab = phone ? window.open('', '_blank') : null;
   busyBtn(btn, true); $('genErr').textContent = '';
   try {
-    const r = await fetch(API_BASE + '/api/document', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tool: TOOL, form:S.form, abuse:S.abuse, format:'pdf', demo:S.mode==='demo' }) });
+    const r = await fetch(API_BASE + '/api/document', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tool: TOOL, form:S.form, abuse:S.abuse, format:'pdf', demo:S.mode==='demo', province: S.province }) });
     if (!r.ok) throw new Error(await r.text());
     const url = URL.createObjectURL(await r.blob());
     if (phone){ if (tab) tab.location.href = url; else location.assign(url); }
@@ -2186,7 +2196,7 @@ async function download(format, btnIn){
   const btn = btnIn || (format === 'pdf' ? $('dlPdf') : $('dlDocx'));
   busyBtn(btn, true); $('genErr').textContent = '';
   try {
-    const r = await fetch(API_BASE + '/api/document', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tool: TOOL, form:S.form, abuse:S.abuse, format, demo:S.mode==='demo' }) });
+    const r = await fetch(API_BASE + '/api/document', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tool: TOOL, form:S.form, abuse:S.abuse, format, demo:S.mode==='demo', province: S.province }) });
     if (!r.ok) throw new Error(await r.text());
     const blob = await r.blob(); const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = format === 'pdf' ? (S.mode === 'demo' ? 'protection-order-draft.pdf' : 'protection-order-Form6-J480E.pdf') : 'protection-order-draft.docx';

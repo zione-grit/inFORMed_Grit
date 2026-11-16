@@ -16,6 +16,7 @@ module.exports = async (req, res) => {
     if (buf.length > 3.2 * 1024 * 1024) return res.status(413).json({ error: 'That recording is too long. Please keep it under about three minutes.' });
     const text = await transcribe(buf, mime, lang);
     await counters.count('voice_in', { lang });
+    await counters.count('voice_bytes', { lang }, { n: buf.length });
     return res.status(200).json({ text });
   } catch (e) {
     console.error('Transcribe error:', e.message);

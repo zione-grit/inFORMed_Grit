@@ -14,6 +14,12 @@
     "optional": "Offered, never pressed."
   },
   "if_unknown": "Every question can be skipped. \"I don't know\" is recorded honestly and never guessed, and missing information or evidence never stops the applicant from generating the form.",
+  "statement_rules": [
+    "Keep the applicant's own account. Never add facts, strengthen allegations or turn uncertainty into certainty.",
+    "Keep clear what the applicant experienced themselves, what someone else told them, what they believe happened, and what they are unsure about. For example: \"My neighbour told me that…\", \"I believe…\", \"I am not sure of the exact date, but it was around…\".",
+    "Use the applicant's own words for threats and insults, translated into English in quotation marks.",
+    "The applicant can review and correct any wording before generating the form."
+  ],
   "steps": [
     {
       "step_id": "about_you",

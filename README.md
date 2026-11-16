@@ -35,7 +35,8 @@ lib/core/                  shared by every tool
   voice.js                 speech to text, and reading aloud with a word-for-word check
   bot.js                   the WhatsApp conversation (commands, tick lists as numbers, documents)
   guard.js                 message limits and the optional access code
-  store.js                 WhatsApp conversation state (Upstash Redis, deleted after 24 hours)
+  store.js                 WhatsApp conversation state (Firestore, deleted after 24 hours)
+  db.js                    the Firestore connection, and the one-way codes used as document names
   background.js            finishing WhatsApp work after the webhook is answered
   knowledge.js             reads and checks legal source records; only approved ones are used
   counters.js              content-free usage counters (Firestore in Johannesburg)
@@ -67,12 +68,7 @@ test/
 
 ### Adding a tool
 
-1. Copy `lib/tools/protection-order` to a new folder, for example `lib/tools/maintenance`.
-2. Change its form fields, instructions (`rules.js`), knowledge, documents and wording. Keep the same exports as `protection-order/index.js`.
-3. Add it to `lib/tools/index.js`.
-4. Give the website page for it `TOOL = 'maintenance'` (the page sends this with every request).
-
-The safety layer, languages, voice, limits and WhatsApp handling then work for it automatically. The website page is still built around the protection order, so a second tool also needs its own page or a tool chooser on the home page.
+inFORMed has one tool today, the protection order, so there is no tool chooser. `docs/ADDING_A_TOOL.md` explains step by step how to add another legal tool later, what it gets from the shared core, and who approves each part.
 
 ## Models
 
@@ -118,7 +114,7 @@ To add a source: copy a record, give it a new `document_id` and file name, fill 
 
 The levels never block anyone: every question can be skipped, "I don't know" is recorded honestly, and missing information or evidence never stops the applicant from generating the form.
 
-The conversation itself still follows the AI's instructions in `rules.js`, which match these steps. The workflow file is the version the legal advisor reviews and approves; next, the engine will read it directly, so an approved change to the workflow changes inFORMed without changing code. `npm test` already checks that every field on the form is in exactly one step, and that every step links only to approved sources.
+In "Fill in my form", the AI's instructions are built from this file (`WORKFLOW_GUIDE` in `rules.js`): the steps in order, each field with its level, the rules, and the statement rules, which keep the applicant's account in their own words and say whether something was experienced, told, believed or is unsure. An approved change to the workflow therefore changes how inFORMed asks, without changing code. "Ask a question" does not use the workflow. `npm test` already checks that every field on the form is in exactly one step, and that every step links only to approved sources.
 
 ## Review page
 
@@ -128,9 +124,16 @@ The conversation itself still follows the AI's instructions in `rules.js`, which
 
 inFORMed counts how it is used, without keeping anything anyone wrote: no names, no messages, no form content, no phone numbers or internet addresses. Each count is a few fixed labels:
 
-- **turn:** tool, channel (web or WhatsApp), language chosen, mode (fill or ask), typed or spoken, the result (reply, support line added, safety reply, or error) and the furthest form section reached so far (s0 to s10), which shows where people stop
-- **document:** tool and format (PDF or Word)
+- **turn:** tool, channel (web or WhatsApp), language chosen on the page, language the person actually wrote in, mode (fill or ask), typed or spoken, the result (reply, support line added, safety reply, or error), the furthest form section reached so far (s0 to s10), which shows where people stop, and the province
+- **form_started:** the first answer that put something on the form, by tool, channel and language
+- **document:** tool, format (PDF or Word) and province. Documents made in the demo are not counted.
 - **voice_in, listen, hear_form:** speaking, listening and "Hear my form", by language
+- **tokens:** AI usage by model, split into new input, cached input and output, so the cost of each month (and of each form, divided by `document`) can be worked out
+- **listen_chars, voice_bytes:** how much was read aloud and how much speech was turned into text, by language, for the read-aloud and voice budget lines
+
+Languages are the 11 written official languages: en, zu, xh, af, nso, tn, st, ts, ss, ve, nr. Province is one of EC, FS, GP, KZN, LP, MP, NC, NW, WC, or "unknown" until the person names a court, police station or place. It is never a town or an address. The AI sets it in its answer from what the person said.
+
+No chat logs and no copies of forms are kept, by design. The counters are the only record of use.
 
 Any label that is not on the allowed list in `lib/core/counters.js` is saved as "other", so content cannot slip in. Counting never changes or blocks a reply. A reply waits at most half a second for its count to be saved, and emergency replies do not wait at all. A count that cannot be saved is dropped, and the function's log says so ("Counter not saved"), so a broken counter is noticed.
 
@@ -169,7 +172,11 @@ Other settings (for example `LIMIT_PER_HOUR`, `MODEL`, `WHATSAPP_PHONE_NUMBER_ID
 Notes:
 - No copy of the function runs while nobody is using inFORMed (`minInstances: 0` in `index.js`), so the first message after a quiet spell waits a few seconds while a copy starts. Before the pilot, set it to `1` so nobody waits; that adds a small fixed monthly cost. At most 5 copies run at once (`maxInstances`), which also caps cost.
 - Cost while building: Firebase Hosting is free at this size, and the function stays within the Blaze plan's free monthly allowance at testing volumes. The only steady charge is a few cents a month for storing the function's build. OpenAI is billed separately.
-- Limits and WhatsApp conversations use Upstash Redis when `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set. Without it, each running copy counts and remembers on its own, which is rough for limits and loses WhatsApp conversations between copies.
+- Limits and WhatsApp conversations are kept in Firestore, shared by every running copy: `limits` (message counts per hour and per day), `wa_chats` (the WhatsApp conversation, 24 hours after the last message) and `wa_seen` (Meta's message ids, to ignore duplicate deliveries). Document names are one-way codes (sha256) of the phone number or internet address, so the number itself is never stored. On your own computer they are kept in memory. `STORE=memory` or `STORE=firestore` chooses explicitly; Upstash Redis still works if `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set and the function is not on Firebase.
+- **One-time step: automatic deletion.** Every Firestore document above holds an `expireAt` time, and Firestore deletes it after that time only once a TTL policy is switched on. In the Google Cloud console for `informed-grit`: **Firestore → Time-to-live (TTL) → Create policy**, collection group `wa_chats`, timestamp field `expireAt`. Repeat for `wa_seen` and `limits`. Or in Cloud Shell:
+  `gcloud firestore fields ttls update expireAt --collection-group=wa_chats --enable-ttl --project=informed-grit`
+  (and the same with `wa_seen` and `limits`). Until then, inFORMed ignores expired documents, but they stay stored. Firestore deletes expired documents within about a day of their time.
+- **After the first deploy, check the internet address.** The per-person limit on the website uses the internet address of the request. On Firebase it uses the last address in `X-Forwarded-For`, which is the one Google adds and cannot be faked. The function's log shows once, after it starts, how many addresses it received (never the address itself). If it says 1 or 2, this is right. If it says more, check with Google's documentation which entry to use, and change `ip` in `lib/core/guard.js`.
 - WhatsApp messages are answered before the webhook replies "ok" (a function may be stopped once it has replied). Duplicate deliveries from Meta are ignored.
 - To run it on your own computer: `npm install`, set `OPENAI_API_KEY`, then `node server.js` and open http://localhost:8080. `npm test` runs the automatic checks.
 - npm may warn that this computer's Node version is not 22. Firebase runs the function on Node 22; the warning can be ignored.
@@ -187,7 +194,7 @@ Notes:
 1. Go to developers.facebook.com → **My Apps → Create App** → type **Business** → add the **WhatsApp** product.
 2. In **WhatsApp → API Setup**: note the **Phone number ID** of the test number, and add your own number under **To**.
 3. Make a **permanent token**: business.facebook.com → **Settings → Users → System users** → add a system user (Admin) → **Add assets** → your app → **Generate token** with `whatsapp_business_messaging` and `whatsapp_business_management`.
-4. Settings: `WHATSAPP_TOKEN` (the permanent token, as a secret), `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN` (any random string you choose), and Upstash Redis.
+4. Settings: `WHATSAPP_TOKEN` (the permanent token) and `WHATSAPP_APP_SECRET` (the **App secret** from the Meta app's **App settings → Basic**), both as secrets in Secret Manager, the same way as the OpenAI key, and add both names to `SECRET_NAMES` in `index.js` (the deploy fails if a name is listed there but not set); then `WHATSAPP_PHONE_NUMBER_ID` and `WHATSAPP_VERIFY_TOKEN` (any random string you choose) in `.env.informed-grit`. inFORMed checks Meta's signature (`X-Hub-Signature-256`) on every message with the app secret and refuses any message that is not signed by Meta, so WhatsApp will not answer until the app secret is set.
 5. Meta app → **WhatsApp → Configuration → Webhook → Edit**: Callback URL `https://YOUR-ADDRESS/api/whatsapp`, the same verify token, then subscribe to **messages**.
 6. From your verified phone, send "hi" to the test number. It asks for your language (and the access code first, if you set one).
 
@@ -222,7 +229,7 @@ Direct-to-form link: `https://informed-grit.web.app/form` opens straight into "H
 
 ## Opening and "Read more"
 
-The "Fill in my form" opening (proposed by GRIT, consent question left out) says inFORMed is an AI chatbot, not a person, and cannot give legal advice; that the story is only used for the form; that the person chooses what to share; that the form fills in as they talk, so they only tell their story once; how to use Quick exit; and to call 10111 if in danger. Under it are two buttons: **Start**, which shows "Tell me what is happening. You can type or talk.", and **Read more**. Typing or talking straight away also works. "Ask a question" opens with the same AI and legal advice disclosure.
+The "Fill in my form" opening (proposed by GRIT, consent question left out) says inFORMed is an AI chatbot, not a person, and cannot give legal advice; that the story is only used for the form; that the person chooses what to share; that the form fills in as they talk, so they only tell their story once; how to use Quick exit; and to call 10111 if in danger. Under it are two buttons: **I understand, start**, which confirms the person has read the opening and shows "Tell me what is happening. You can type or talk.", and **Read more**. Typing or talking straight away also works. "Ask a question" opens with the same AI and legal advice disclosure.
 
 "Read more" (also linked in the footer) covers: not a lawyer; who can see what you write (messages go to OpenAI to produce replies, OpenAI is asked not to keep them, GRIT does not see or store them); how long it is kept (the chat not at all; the form on the phone, PIN-locked if saved); how to delete it; the shared-phone risk; and the danger numbers. The wording is in `public/i18n.js` (`fillOpening`, `fillStart`, `startBtn`, `askOpening`, `iTitle`, `iH1`–`iH6`, `iP1`–`iP6`). The WhatsApp opening in `lib/tools/protection-order/openings.js` says instead that the chat is kept for 24 hours and how to delete it.
 
@@ -287,7 +294,9 @@ Users do not see which document each answer came from. To see it, open the site 
 - Crisis replies on the website show tap-to-call buttons (10111, 10177, GBV Command Centre).
 - **Quick exit** button on every page: clears the page and goes to a weather search.
 - Website conversations live only in the open browser tab. Nothing is saved on the server, and OpenAI is called with `store: false`.
-- WhatsApp keeps the conversation in Redis for 24 hours (`CHAT_TTL_HOURS`), and `DELETE` removes it immediately.
+- WhatsApp keeps the conversation in Firestore for 24 hours after the last message (`CHAT_TTL_HOURS`), and `DELETE` removes it immediately.
+- Every WhatsApp message must carry Meta's signature, checked with the app secret; anything else is refused.
+- Reading aloud sends the text in the body of the request, never in its address, so it does not appear in Google's request logs.
 - The model never logs what people write; only error messages are logged.
 
 ## Changes from GRIT's v8.14 system prompt
@@ -301,10 +310,8 @@ Users do not see which document each answer came from. To see it, open the site 
 - Voice: test isiZulu speech recognition and read-aloud with native speakers. They are passed as hints, and quality for isiZulu is not yet known. Afrikaans and English are supported directly.
 - isiZulu and Afrikaans replies are written by the model. Native speakers at GRIT should review them, and the fixed safety replies need GRIT-approved translations (currently sent in English).
 - Safeguarding sign-off on the crisis replies and flow.
-- Verify Meta's webhook signature (`X-Hub-Signature-256`) against the raw request body.
-- A shared rate limit (the current one is per server instance) and a POPIA review of the 24-hour bot storage.
-- The per-person limit trusts the internet address the request claims to come from. Check which address Firebase passes on after the first deploy, and use that one (`ip` in `lib/core/guard.js`).
+- A POPIA review of the 24-hour WhatsApp storage in Firestore.
+- Switch on the three Firestore TTL policies (see Hosting), and check the internet address line in the log after the first deploy.
 - Firebase Hosting delivers the pages from Google's global network and keeps the internet address of each visitor for a few months. It does not see what people write. Say this in the privacy notice and the POPIA assessment.
-- Reading aloud sends the text to be read in the address of the request (`/api/speak?t=...`), and Google keeps request addresses in the function's logs. Move the text into the body of the request, or switch off request logging for the function, before real users.
 - Brand colours are taken from the GRIT logo (navy, teal, indigo). Change the tokens at the top of `public/index.html` if GRIT has official colour codes.
 - Using conversations to improve the bot needs survivors' informed opt-in consent, POPIA compliance and GRIT's written authorisation and safeguarding sign-off. This build saves nothing for training.

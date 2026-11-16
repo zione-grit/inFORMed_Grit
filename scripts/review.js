@@ -26,6 +26,7 @@ function page(tool) {
   L.push('', `## Workflow: ${wf.workflow_id}, version ${wf.version}`, '');
   L.push(`Form: ${wf.form}. Status: ${wf.approval_status.replace(/_/g, ' ')}${wf.reviewed_by ? `, reviewed by ${wf.reviewed_by} on ${wf.review_date}` : ''}.`, '');
   L.push(`**When the applicant cannot answer:** ${wf.if_unknown}`, '');
+  if (wf.statement_rules && wf.statement_rules.length) { L.push('**How the applicant\'s statements are written:**', ''); for (const r of wf.statement_rules) L.push(`- ${r}`); L.push(''); }
   L.push('**What the levels mean:**', '');
   for (const [k, v] of Object.entries(wf.field_needs)) L.push(`- **${NEED[k]}:** ${v}`);
   for (const s of wf.steps) {

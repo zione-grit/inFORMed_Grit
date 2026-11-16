@@ -21,6 +21,13 @@ Form: Form 6 and Form 6A (J480E, March 2025). Status: pending legal review.
 
 **When the applicant cannot answer:** Every question can be skipped. "I don't know" is recorded honestly and never guessed, and missing information or evidence never stops the applicant from generating the form.
 
+**How the applicant's statements are written:**
+
+- Keep the applicant's own account. Never add facts, strengthen allegations or turn uncertainty into certainty.
+- Keep clear what the applicant experienced themselves, what someone else told them, what they believe happened, and what they are unsure about. For example: "My neighbour told me that…", "I believe…", "I am not sure of the exact date, but it was around…".
+- Use the applicant's own words for threats and insults, translated into English in quotation marks.
+- The applicant can review and correct any wording before generating the form.
+
 **What the levels mean:**
 
 - **Required:** The court needs it. Still never blocks the application: if the applicant does not know, that is recorded.

@@ -66,7 +66,19 @@ async function process_(body) {
   }
 }
 
-// Production TODO: verify Meta's X-Hub-Signature-256 against the raw request body.
+// Every message from Meta is signed with the app secret (header X-Hub-Signature-256). A message without a
+// valid signature is refused, so nobody can pretend to be WhatsApp. WHATSAPP_APP_SECRET is the "App secret"
+// in the Meta app's Settings > Basic, stored in Secret Manager like the other keys.
+const crypto = require('crypto');
+function signedByMeta(req) {
+  const secret = String(process.env.WHATSAPP_APP_SECRET || '').trim();
+  const sig = String(req.headers['x-hub-signature-256'] || '');
+  const raw = req.rawBody;
+  if (!secret || !sig.startsWith('sha256=') || !raw) return false;
+  const want = Buffer.from('sha256=' + crypto.createHmac('sha256', secret).update(raw).digest('hex'));
+  const got = Buffer.from(sig);
+  return want.length === got.length && crypto.timingSafeEqual(want, got);
+}
 
 module.exports = async (req, res) => {
   if (req.method === 'GET') {
@@ -76,6 +88,7 @@ module.exports = async (req, res) => {
   }
   if (req.method !== 'POST') return res.status(405).send('POST only');
   if (!process.env.WHATSAPP_TOKEN || !PHONE_ID()) return res.status(200).send('not configured');
+  if (!signedByMeta(req)) { console.error('WhatsApp: message refused, signature missing or wrong.'); return res.status(401).send('Bad signature'); }
   await later(process_(req.body || {}).catch(e => console.error('WhatsApp handler error:', e.message)));
   return res.status(200).send('ok');
 };

@@ -11,7 +11,7 @@ const { defineSecret } = require('firebase-functions/params');
 
 // Keys the function may read. Each one must exist in Secret Manager before deploying:
 //   firebase functions:secrets:set NAME --data-file "%TEMP%\\k.txt" --project informed-grit
-// When WhatsApp goes live, add 'WHATSAPP_TOKEN' and 'WHATSAPP_VERIFY_TOKEN' here.
+// When WhatsApp goes live, add 'WHATSAPP_TOKEN', 'WHATSAPP_VERIFY_TOKEN' and 'WHATSAPP_APP_SECRET' here.
 const SECRET_NAMES = ['OPENAI_API_KEY'];
 const SECRETS = SECRET_NAMES.map(n => defineSecret(n));
 

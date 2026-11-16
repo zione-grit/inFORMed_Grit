@@ -6,7 +6,7 @@ const counters = require('../lib/core/counters');
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).send('POST only.');
   try {
-    let { tool: toolId, form = {}, abuse = [], format = 'pdf', demo = false } = req.body || {};
+    let { tool: toolId, form = {}, abuse = [], format = 'pdf', demo = false, province } = req.body || {};
     const tool = tools.get(toolId);
     // The person may have typed into the form panel in another language: make sure the court draft is English.
     if (process.env.OPENAI_API_KEY) {
@@ -19,7 +19,7 @@ module.exports = async (req, res) => {
     res.setHeader('Content-Type', isWord ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${tool.documents.fileName(format, demo)}"`);
     res.setHeader('Cache-Control', 'no-store');
-    await counters.count('document', { tool: tool.id, format: isWord ? 'docx' : 'pdf' });
+    if (!demo) await counters.count('document', { tool: tool.id, format: isWord ? 'docx' : 'pdf', province: province || 'unknown' });
     return res.status(200).send(buf);
   } catch (e) {
     console.error('Document error:', e.message);
