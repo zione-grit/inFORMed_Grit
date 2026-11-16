@@ -1,6 +1,6 @@
 // WhatsApp Cloud API webhook (Meta). See README for setup with Meta's free test number.
 const { later } = require('../lib/core/background');
-const { handle } = require('../lib/core/bot');
+const { handle, tr } = require('../lib/core/bot');
 const store = require('../lib/core/store');
 const { transcribe } = require('../lib/core/voice');
 const tools = require('../lib/tools');
@@ -33,7 +33,7 @@ async function sendDoc(to, format, s) {
   fd.append('file', new Blob([buf], { type: mime }), name);
   const up = await fetch(`${GRAPH}/${PHONE_ID()}/media`, { method: 'POST', headers: auth(), body: fd });
   const j = await up.json();
-  if (!j.id) { console.error('WhatsApp upload failed'); return sendText(to, 'Sorry, I could not send the document just now. Please try again.'); }
+  if (!j.id) { console.error('WhatsApp upload failed'); return sendText(to, tr('wa.docFail', s.lang)); }
   return wa({ to, type: 'document', document: { id: j.id, filename: name } });
 }
 
@@ -45,18 +45,18 @@ async function process_(body) {
       const text = m.type === 'text' ? m.text.body
         : m.type === 'interactive' ? (m.interactive.button_reply || m.interactive.list_reply || {}).title
         : m.type === 'button' ? m.button.text : null;
-      let body = text, voice = false;
+      let body = text, voice = false, st = null;
       if (!body && m.type === 'audio' && m.audio && m.audio.id) {
         try {
           const meta = await (await fetch(`${GRAPH}/${m.audio.id}`, { headers: auth() })).json();
           const bin = await fetch(meta.url, { headers: auth() });
-          const st = await store.get(`chat:whatsapp:${from}`);
+          st = await store.get(`chat:whatsapp:${from}`);
           body = await transcribe(Buffer.from(await bin.arrayBuffer()), meta.mime_type || m.audio.mime_type || 'audio/ogg', (st && st.lang) || 'auto');
           voice = true;
         } catch (e) { console.error('WhatsApp voice error:', e.message); }
-        if (!body) { await sendText(from, 'Sorry, I could not hear that voice note clearly. Please try again, or type your message.'); continue; }
+        if (!body) { await sendText(from, tr('wa.voiceFail', (st && st.lang) || 'en')); continue; }
       }
-      if (!body) { await sendText(from, 'I can read text messages and voice notes. Please type, or send a voice note.'); continue; }
+      if (!body) { st = st || await store.get(`chat:whatsapp:${from}`); await sendText(from, tr('wa.textOnly', (st && st.lang) || 'en')); continue; }
       const actions = await handle({ channel: 'whatsapp', userKey: from, text: body, voice, msgId: m.id });
       for (const a of actions) {
         if (a.doc) await sendDoc(from, a.doc, await store.get(`chat:whatsapp:${from}`));

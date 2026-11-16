@@ -13,7 +13,8 @@
         "firebase-debug.*.log",
         "*.local",
         "review",
-        "scripts"
+        "scripts",
+        "translations"
       ]
     }
   ],

@@ -15,6 +15,8 @@ const mock = http.createServer((req, res) => {
     let out;
     if (name === 'english_form_text') out = { updates: JSON.parse(j.input[0].content).map(u => ({ field: u.field, value: 'EN: ' + u.value })) };
     else if (name === 'listen_translation') out = { text: 'Igama lami nguThandi' };
+    else if (name === 'golden_judge') out = { checks: JSON.parse(j.input[0].content).rules.map(r => ({ rule: r, pass: true, why: 'test' })) };
+    else if (name === 'translation') out = { items: JSON.parse(j.input[0].content).map(x => ({ key: x.key, text: x.key === 'safety.support' ? 'no number here' : 'XH ' + x.text })) };
     else {
       const last = [...j.input].reverse().find(m => m.role === 'user').content;
       out = { reply: 'Thank you for telling me.', updates: [{ field: 'history', value: last }], abuse_types: ['physical'], sources: [], grounding: 'none',
@@ -253,6 +255,85 @@ async function check(name, fn) {
     const { docId } = require('../lib/core/db');
     const id = docId('chat:whatsapp:27821234567');
     assert.match(id, /^[0-9a-f]{40}$/); assert.ok(!id.includes('2782'));
+  });
+
+  await check('every official written language can be chosen, on the website and WhatsApp', async () => {
+    const { LANGS } = require('../public/fields.js');
+    assert.deepEqual(LANGS.map(l => l.id), ['auto', 'en', 'zu', 'xh', 'af', 'nso', 'tn', 'st', 'ts', 'ss', 've', 'nr']);
+    const { handle } = require('../lib/core/bot');
+    let n = 0; const say = t => handle({ channel: 'test', userKey: 'lang1', text: t, msgId: 'l' + (++n) });
+    const first = (await say('hi'))[0].text; assert.match(first, /11\. isiNdebele/);
+    const picked = await say('3'); assert.ok(picked[0].buttons && picked[0].buttons.length === 2);
+    const st = await require('../lib/core/store').get('chat:test:lang1'); assert.equal(st.lang, 'xh');
+    const page = await (await fetch(base + '/')).text(); assert.match(page, /\/i18n\/' \+ lang \+ '\.json/);
+    const zu = await fetch(base + '/i18n/zu.json'); assert.equal(zu.status, 200); assert.ok((await zu.json()).strings.startBtn);
+  });
+  await check('translations: every one in use keeps its numbers, links and tags', async () => {
+    const T = require('../scripts/translations'), en = T.english();
+    for (const f of require('fs').readdirSync(require('path').join(__dirname, '..', 'public', 'i18n'))) {
+      const lang = f.replace('.json', ''), d = T.read(lang);
+      assert.ok(require('../lib/core/i18n').CODES.includes(lang), f + ' is not a language code');
+      const bad = Object.keys(d.strings).filter(k => en[k] && T.state(en, d, k) === 'unsafe');
+      assert.deepEqual(bad, [], lang + ': ' + bad.join(', '));
+    }
+  });
+  await check('translations: filled by the model, used only when safe, and read back from a spreadsheet', async () => {
+    const fs = require('fs'), os = require('os'), path = require('path');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'i18n-')); process.env.I18N_DIR = dir;
+    const i18n = require('../lib/core/i18n'), T = require('../scripts/translations'), safety = require('../lib/core/safety');
+    const log = console.log; console.log = () => {}; const w = process.stdout.write; process.stdout.write = () => true;
+    try { await T.fill(['xh']); } finally { console.log = log; process.stdout.write = w; }
+    i18n._clear();
+    const d = T.read('xh');
+    assert.equal(d.status['safety.death'], 'machine'); assert.ok(!d.strings['safety.support'], 'a translation without its number is refused');
+    assert.match(safety.reply('death', 'xh'), /^XH .*10111/);
+    // In the chat: the emergency reply comes in the chosen language.
+    const r = await chat('i am in danger', { lang: 'xh' }); assert.match(r.reply, /^XH /); assert.equal(r.crisis, true);
+    // A translation that loses a phone number is never sent: the English is sent instead.
+    d.strings['safety.death'] = 'XH call nobody'; fs.writeFileSync(path.join(dir, 'xh.json'), JSON.stringify(d)); i18n._clear();
+    assert.equal(safety.reply('death', 'xh'), safety.REPLIES.death);
+    // Out of date: the English changed after it was translated.
+    d.strings['safety.death'] = 'XH ' + safety.REPLIES.death; d.from['safety.death'] = 'old'; fs.writeFileSync(path.join(dir, 'xh.json'), JSON.stringify(d)); i18n._clear();
+    assert.equal(safety.reply('death', 'xh'), safety.REPLIES.death);
+    // Spreadsheet round trip: a native speaker's change is marked checked.
+    console.log = () => {}; try { T.exportCsv(['xh'], dir); } finally { console.log = log; } let csv = fs.readFileSync(path.join(dir, 'xh.csv'), 'utf8');
+    csv = csv.replace(/\r\nstartBtn,("[^"]*"|[^,]*),[^,\r\n]*,/, m => m.replace(/,[^,]*,$/, ',"Ndiyaqonda, qala",'));
+    fs.writeFileSync(path.join(dir, 'xh.csv'), csv);
+    console.log = () => {}; try { T.importCsv([path.join(dir, 'xh.csv')]); } finally { console.log = log; }
+    const back = T.read('xh'); assert.equal(back.strings.startBtn, 'Ndiyaqonda, qala'); assert.equal(back.status.startBtn, 'checked');
+    delete process.env.I18N_DIR; i18n._clear();
+  });
+
+  await check('golden and red-team tests: the cases are valid and the runner works', async () => {
+    const G = require('../scripts/golden'), data = G.load();
+    assert.ok(data.cases.length >= 40);
+    const langs = new Set(data.cases.filter(c => c.group === 'languages' && c.expect.language).map(c => c.expect.language));
+    assert.equal(langs.size, 11, 'a case in every official written language');
+    const deps = { ...require('../lib/core/engine'), callModel: require('../lib/core/llm').callModel, looksEnglish: require('../lib/core/language').looksEnglish };
+    const t = await G.runCase(data.cases.find(c => c.id === 'trigger-exact'), deps); assert.ok(t.pass, JSON.stringify(t.checks));
+    const p = await G.runCase(data.cases.find(c => c.id === 'rt-poem'), deps); assert.ok(p.pass, JSON.stringify(p.checks)); assert.ok(p.checks.some(x => /^judge/.test(x[0])));
+    assert.match(G.report([t, p], new Date()), /2 of 2 cases passed/);
+  });
+
+  await check('service directory: records are checked, and only verified, recently checked ones are ready', async () => {
+    const d = require('../lib/core/directory');
+    const good = { service_id: 'gp-test-court', name: 'Test Magistrates Court', type: 'magistrates_court', referral_tier: '2', province: 'GP', phone: '012 345 6789',
+      source: 'test', contact_status: 'verified', last_checked: '2026-11-01', checked_by: 'test', active: 'yes', languages: 'zu;en' };
+    assert.deepEqual(d.check(good), []);
+    assert.equal(d.readiness(good, '2026-11-16').ready, true);
+    assert.equal(d.readiness(good, '2027-05-02').ready, false, 'due for a check after 6 months');
+    assert.equal(d.readiness({ ...good, contact_status: 'not_verified' }, '2026-11-16').ready, false);
+    const bad = d.check({ ...good, province: 'Gauteng', phone: '123', languages: 'zulu', website: 'http://x' });
+    assert.equal(bad.length, 4, bad.join('; '));
+    const header = require('fs').readFileSync(require('path').join(__dirname, '..', 'directory', 'template.csv'), 'utf8').trim().split(',');
+    assert.deepEqual(header, d.FIELDS);
+  });
+  await check('usage export: counts become one row each, with the labels in columns', async () => {
+    const u = require('../scripts/usage');
+    const rows = u.toRows({ day: '2026-11-16', counts: { 'document|protection-order|pdf|GP': 4, 'tokens|gpt-6.1-terra|output': 900 } });
+    assert.equal(rows.length, 2);
+    assert.deepEqual([rows[0].event, rows[0].format, rows[0].province, rows[0].count], ['document', 'pdf', 'GP', 4]);
+    assert.match(u.csv(rows), /^day,event,tool,/);
   });
 
   server.close(); mock.close();

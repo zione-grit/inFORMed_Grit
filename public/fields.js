@@ -163,11 +163,22 @@
     { id: 'evidence', short: 'Evidence guide' },
   ];
 
+  // South Africa's written official languages, by number of home-language speakers. label is the
+  // language's own name (shown in the language list); name is its English name (used in instructions).
+  // South African Sign Language is also official; it is not a written language, so it is not listed.
   const LANGS = [
-    { id: 'auto', label: 'Match my language' },
-    { id: 'en', label: 'English' },
-    { id: 'zu', label: 'isiZulu' },
-    { id: 'af', label: 'Afrikaans' },
+    { id: 'auto', label: 'Match my language', name: 'the person\'s language' },
+    { id: 'en', label: 'English', name: 'English' },
+    { id: 'zu', label: 'isiZulu', name: 'isiZulu' },
+    { id: 'xh', label: 'isiXhosa', name: 'isiXhosa' },
+    { id: 'af', label: 'Afrikaans', name: 'Afrikaans' },
+    { id: 'nso', label: 'Sepedi', name: 'Sepedi (Sesotho sa Leboa)' },
+    { id: 'tn', label: 'Setswana', name: 'Setswana' },
+    { id: 'st', label: 'Sesotho', name: 'Sesotho' },
+    { id: 'ts', label: 'Xitsonga', name: 'Xitsonga' },
+    { id: 'ss', label: 'siSwati', name: 'siSwati' },
+    { id: 've', label: 'Tshiven\u1E13a', name: 'Tshiven\u1E13a' },
+    { id: 'nr', label: 'isiNdebele', name: 'isiNdebele' },
   ];
 
   // The official tick lists, exactly as printed on Form 6 / 6A (J480E). "other" options take extra words after a colon.

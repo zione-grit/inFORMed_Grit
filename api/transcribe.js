@@ -1,6 +1,6 @@
 // Turns a voice recording into text. The audio is sent to OpenAI and not kept.
 const { transcribe } = require('../lib/core/voice');
-const { overLimit, LIMIT_REPLY, ip, codeOk } = require('../lib/core/guard');
+const { overLimit, limitReply, ip, codeOk } = require('../lib/core/guard');
 const counters = require('../lib/core/counters');
 
 module.exports = async (req, res) => {
@@ -8,7 +8,7 @@ module.exports = async (req, res) => {
   if (!codeOk(req.headers['x-demo-code'])) return res.status(401).json({ error: 'Wrong or missing access code.' });
   // Voice has its own limit; the message it becomes is counted when it is sent.
   const over = await overLimit('voice:' + ip(req), { perHour: 150, global: false });
-  if (over) return res.status(429).json({ error: LIMIT_REPLY[over] });
+  if (over) return res.status(429).json({ error: limitReply(over, (req.body || {}).lang) });
   try {
     const { audio, mime, lang } = req.body || {};
     if (!audio) return res.status(400).json({ error: 'No audio.' });

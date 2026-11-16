@@ -43,8 +43,8 @@ A tool is one folder in `lib/tools/`. Copy `lib/tools/protection-order/` to star
    - add its id to `TOOLS` in `scripts/review.js`, so it gets its own review page.
 8. **Website.** The current page is built for the protection order: `public/index.html` sends `TOOL = 'protection-order'`, and the form panel is drawn from `public/fields.js`. A second tool needs either its own page (for example `public/maintenance/index.html` with its own field definition and `TOOL = 'maintenance'`) or a tool chooser on the home page that switches between tools. This is the largest part of adding a tool.
 9. **WhatsApp.** WhatsApp conversations remember which tool they use (`tool` in the conversation state). Add a way for people to choose the new tool, for example a word they send or a button on the first message.
-10. **Translations.** Add the tool's fixed wording to the translation workbook, and have it translated and checked before the tool is offered in that language.
-11. **Checks.** Add automatic checks for the new tool to `test/smoke.js`: its form is generated, every field is in exactly one workflow step, and only approved sources reach the AI. Then run the golden and red-team tests for the tool in each language.
+10. **Translations.** Put the tool's page text in `public/i18n.js` and its WhatsApp wording in `chat` and `openings` in `index.js`; `npm run translations fill` then translates it into every language. Have native speakers check it through the spreadsheet route in `translations/README.md`.
+11. **Checks.** Add automatic checks for the new tool to `test/smoke.js`: its form is generated, every field is in exactly one workflow step, and only approved sources reach the AI. Write its golden and red-team cases in `test/golden/<tool id>.json`, and run them in each language.
 12. **Approval.** The legal advisor approves the sources, workflow and documents; the safeguarding lead confirms the safety wording; GRIT's leadership approves the launch.
 13. **Deploy** as usual: `firebase deploy --only functions,hosting --project informed-grit`.
 

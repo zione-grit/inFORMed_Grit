@@ -8,6 +8,7 @@ Only sources with the status "approved" are used by inFORMed. "Needs legal revie
 
 | Source | Type | Legal reference | Version | Effective | Status | Reviewed by | Review date | Next review |
 |---|---|---|---|---|---|---|---|---|
+| **Domestic Violence Act 116 of 1998, as amended** (`dv_act`) | act | Domestic Violence Act 116 of 1998, sections 1, 2, 2B, 3, 4 to 14 and 17, as amended by the Domestic Violence Amendment Act 14 of 2021 | As amended by Act 14 of 2021 (in force 14 April 2023); summary 1 | 2023-04-14 | draft, needs legal review | – | – | – |
 | **Evidence Guide** (`evidence`) | approved guidance | Form 6, sections 5 and 10 | 1.0 | – | approved, needs legal review | GRIT | – | – |
 | **Protection Order Application Form (Form 6 and 6A)** (`form`) | official form | Domestic Violence Act 116 of 1998, section 4(1); Domestic Violence Regulations, Form 6 and Form 6A (J480E) | J480E, March 2025 | – | approved, needs legal review | GRIT | – | – |
 | **GRIT Protection Order Guide** (`guide`) | approved guidance | Domestic Violence Act 116 of 1998 | 1.0 (Zuzi knowledge base LEGAL-01) | – | approved, needs legal review | GRIT | – | – |

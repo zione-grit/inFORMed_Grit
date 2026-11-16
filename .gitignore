@@ -7,3 +7,9 @@ node_modules
 firebase-debug.log
 firebase-debug.*.log
 *.local
+
+# Exports and working copies that stay off GitHub (the repository is public)
+usage.csv
+directory/*.csv
+!directory/template.csv
+translations/*.csv

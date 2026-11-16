@@ -17,6 +17,10 @@
   "scripts": {
     "start": "node server.js",
     "test": "node test/smoke.js",
-    "review": "node scripts/review.js"
+    "review": "node scripts/review.js",
+    "translations": "node scripts/translations.js",
+    "golden": "node scripts/golden.js",
+    "directory": "node scripts/directory.js",
+    "usage": "node scripts/usage.js"
   }
 }

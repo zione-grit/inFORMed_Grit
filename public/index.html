@@ -1294,7 +1294,8 @@ const $ = id => document.getElementById(id);
 const TOOL = 'protection-order';
 // Where requests go: inFORMed's function in Johannesburg (public/config.js). On your own computer, the same server.
 const API_BASE = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '' : String(window.INFORMED_API || '').replace(/\/+$/, '');
-// Interface language. The fill opening is GRIT's original opening (translated for isiZulu and Afrikaans).
+// Interface language. English is in i18n.js; every other language is loaded from /i18n/<code>.json when chosen.
+// Anything not translated yet is shown in English. The fill opening is GRIT's original opening.
 const FILL_OPENING_EN = I18N.en.fillOpening;
 let UI = 'en';
 function t(k, vars){ let v = (I18N[UI] && I18N[UI][k] != null) ? I18N[UI][k] : (I18N.en[k] != null ? I18N.en[k] : k); if (vars) for (const x in vars) v = v.split('{' + x + '}').join(vars[x]); return v; }
@@ -1328,12 +1329,21 @@ const I18N_NODES = [];
   });
 })();
 let DETECTED = null;
+const UI_LANGS = LANGS.map(l => l.id).filter(id => id !== 'auto');
 function autoUi(){
   if (DETECTED) return DETECTED;
-  const list = (navigator.languages || [navigator.language || 'en']).map(x => String(x).toLowerCase().slice(0, 2));
-  return list.find(x => x === 'zu' || x === 'af') || 'en';
+  const list = (navigator.languages || [navigator.language || 'en']).map(x => String(x).toLowerCase().split('-')[0]);
+  return list.find(x => UI_LANGS.includes(x)) || 'en';
+}
+// Loads a language's page text once. If it cannot be loaded, the page stays in English.
+const LOADING = {};
+function loadLang(lang){
+  if (I18N[lang] || lang === 'en' || !UI_LANGS.includes(lang)) return Promise.resolve();
+  return LOADING[lang] || (LOADING[lang] = fetch('/i18n/' + lang + '.json').then(r => r.ok ? r.json() : null)
+    .then(j => { if (j && j.strings) I18N[lang] = j.strings; }).catch(() => {}));
 }
 function setUi(lang){
+  if (!I18N[lang] && lang !== 'en' && UI_LANGS.includes(lang)){ loadLang(lang).then(() => { if (I18N[lang] && (LANG === lang || (LANG === 'auto' && autoUi() === lang))) setUi(lang); }); }
   UI = I18N[lang] ? lang : 'en';
   document.documentElement.lang = UI;
   I18N_NODES.forEach(([n, k, kind, lead, trail]) => {
@@ -1675,7 +1685,7 @@ async function callChat(spoken = false){
     S.msgs.push({ role:'assistant', content:j.reply });
     if (S.cm === 'fill') applyResult(j);
     if (S.cm === 'fill' && (j.offer === 'protections' || j.offer === 'money')) choiceCard(j.offer, j.offer_first || []);
-    if (LANG === 'auto' && ['en','zu','af'].includes(j.language) && j.language !== UI){ DETECTED = j.language; setUi(j.language); }
+    if (LANG === 'auto' && UI_LANGS.includes(j.language) && j.language !== UI){ DETECTED = j.language; setUi(j.language); }
   } catch(e){
     dots.remove();
     addMsg('assistant', t('serverErr'));
@@ -1924,7 +1934,7 @@ $('vrHear').onclick = () => { unlockAudio(); if (inp.value.trim()) listen(inp.va
 $('vrAgain').onclick = () => { stopAudio(); inp.value = V.before; autosize(); V.spoken = false; showReview(false); toggleMic(); };
 $('vrSend').onclick = () => { stopAudio(); sendLive(); };
 /* "Hear my form": the whole application read aloud, so people who cannot read know exactly what they will swear to.
-   In isiZulu or Afrikaans it is translated for listening only; the form itself stays in English. */
+   In any other language it is translated for listening only; the form itself stays in English. */
 function formSpeech(){
   const v = id => (S.form[id] || '').trim();
   const out = []; let cur = null;

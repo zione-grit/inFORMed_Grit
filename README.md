@@ -26,7 +26,7 @@ api/                       the endpoints
   whatsapp.js              WhatsApp webhook
   transcribe.js            voice to text (website microphone)
   speak.js                 reads a reply aloud (Listen button)
-  translate.js             translates the form for "Hear my form" in isiZulu or Afrikaans (listening only)
+  translate.js             translates the form for "Hear my form" in the person's language (listening only)
 lib/core/                  shared by every tool
   engine.js                one turn: safety check, model call, "always English" step, support line
   llm.js                   the AI model call (change the model here or with MODEL)
@@ -56,7 +56,8 @@ lib/tools/
 public/                    the website
   index.html               home page, chat, form panel, demo, sources
   fields.js                the protection order form definition, shared by the website and the server
-  i18n.js                  all page text in English, isiZulu and Afrikaans
+  i18n.js                  all page text in English (the source for every other language)
+  i18n/<code>.json         the translations, one file per language (see translations/README.md)
   docs.json                the approved legal sources, for the sources view (written by npm run review)
 review/
   protection-order.md      readable page of the legal sources and the workflow, for the legal advisor
@@ -64,6 +65,15 @@ scripts/
   review.js                writes review/ and public/docs.json (npm run review)
 test/
   smoke.js                 the automatic checks (npm test)
+  golden/protection-order.json  golden and red-team conversations (npm run golden)
+scripts/
+  review.js                the review page (npm run review)
+  translations.js          translation status, fill, export and import (npm run translations)
+  golden.js                runs the golden and red-team tests against the real model (npm run golden)
+  directory.js             checks and uploads the service directory (npm run directory)
+  usage.js                 exports the usage counters to a spreadsheet (npm run usage)
+translations/README.md     how translations work, step by step
+directory/                 the service directory: what each column means, and the template
 ```
 
 ### Adding a tool
@@ -106,6 +116,8 @@ Only records with `approval_status: approved` are given to the AI and shown unde
 
 The six documents the prototype has always used are records now, marked approved with `reviewed_by: GRIT`, because they are GRIT's material already in use. Their `review_date` is empty until the legal advisor reviews them, so the review page lists them as "needs legal review". The AI receives exactly the same text as before: the move to records was checked word for word.
 
+The Domestic Violence Act itself is now a record too (`dv_act`): a plain summary of the sections inFORMed relies on (who can apply, children, after-hours applications, interim and final orders, what the court can order, breach, weapons, the duty to report), prepared from the consolidated text on SAFLII. It is a **draft**, so the AI does not see it until the legal advisor checks it against the Act and approves it. The Domestic Violence Regulations are next.
+
 To add a source: copy a record, give it a new `document_id` and file name, fill in the fields, set `approval_status` to `draft`, and run `npm run review`. When the legal advisor approves it, set `approved`, `reviewed_by`, `review_date` and `next_review`, run `npm run review` again, and deploy.
 
 ## Workflow
@@ -134,6 +146,8 @@ inFORMed counts how it is used, without keeping anything anyone wrote: no names,
 Languages are the 11 written official languages: en, zu, xh, af, nso, tn, st, ts, ss, ve, nr. Province is one of EC, FS, GP, KZN, LP, MP, NC, NW, WC, or "unknown" until the person names a court, police station or place. It is never a town or an address. The AI sets it in its answer from what the person said.
 
 No chat logs and no copies of forms are kept, by design. The counters are the only record of use.
+
+For the dashboard, `npm run usage` writes `usage.csv`: one row per count, with the day, the event, each label in its own column and the number. It reads Firestore, so run it in Google Cloud Shell: `git clone https://github.com/zione-grit/inFORMed_Grit.git`, `cd inFORMed_Grit`, `npm ci`, `npm run usage` (or `npm run usage 2026-12-01 2026-12-31` for some days), then download `usage.csv` from the three-dot menu. The file is not committed to GitHub.
 
 Any label that is not on the allowed list in `lib/core/counters.js` is saved as "other", so content cannot slip in. Counting never changes or blocks a reply. A reply waits at most half a second for its count to be saved, and emergency replies do not wait at all. A count that cannot be saved is dropped, and the function's log says so ("Counter not saved"), so a broken counter is noticed.
 
@@ -275,13 +289,20 @@ GRIT's evidence guide is inFORMed's sixth reference document. inFORMed asks abou
 
 "Print" sits next to Download in Review your application, and in the Preview bar. It prints the official Form 6 (J480E) PDF, the same file as Download PDF, not the on-screen preview. On a computer the print window opens straight away. Phones can't print a PDF from inside a web page, so on a phone the form opens in a new tab, where the phone's Share or Print option prints it.
 
-## Page languages
+## Languages
 
-Choosing isiZulu or Afrikaans switches all the page text: home page, buttons, chat messages, dialogs and help numbers. "Match my language" starts in the phone's language (if it is isiZulu or Afrikaans), and switches after the person's first message, in the language they wrote in. The form itself (form panel fields, preview, PDF and Word) stays in English, because it is filled in English for the court. This is enforced in code, not only asked of the AI: when the conversation is not in English, every form update goes through a separate translation step (`ensureEnglish` in `lib/core/language.js`) before it reaches the form, and anything typed into the form panel in another language is translated when the PDF or Word draft is made. Words someone said are kept in English with the original words in brackets. The scripted demo and the fixed safety replies are also still in English.
+inFORMed works in all 11 written official languages: English, isiZulu, isiXhosa, Afrikaans, Sepedi, Setswana, Sesotho, Xitsonga, siSwati, Tshivenḓa and isiNdebele (`LANGS` in `public/fields.js`). They are in the language list on the website, and as a numbered list on WhatsApp (reply with the number or the language's name; send `LANGUAGE` to change it).
+
+- The AI writes its replies in the chosen language, or in the language the person writes in ("Match my language").
+- The fixed wording (page text, emergency replies, support line, limits, WhatsApp messages) comes from `public/i18n/<code>.json`. Until a language has been translated, its fixed wording shows in English. `npm run translations fill` translates everything with the AI model, in a few minutes; `translations/README.md` explains it, and how native speakers check and correct it through a spreadsheet.
+- A translated emergency reply is only sent if it has every phone number and link of GRIT's English reply; otherwise the English is sent. The same check applies to every fixed text.
+- Speaking and listening work in every language through the voice models, with the language passed as a hint. How well they work in each language still needs testing with native speakers.
+
+Choosing a language switches all the page text: home page, buttons, chat messages, dialogs and help numbers. "Match my language" starts in the phone's language (if it is one of the 11), and switches after the person's first message, in the language they wrote in. The form itself (form panel fields, preview, PDF and Word) stays in English, because it is filled in English for the court. This is enforced in code, not only asked of the AI: when the conversation is not in English, every form update goes through a separate translation step (`ensureEnglish` in `lib/core/language.js`) before it reaches the form, and anything typed into the form panel in another language is translated when the PDF or Word draft is made. Words someone said are kept in English with the original words in brackets. The scripted demo and the fixed safety replies are also still in English.
 
 Changing the language also changes inFORMed's welcome, the Start question and the suggested questions already on the screen, with a short fade (they are tagged with their text key in `addMsg`). Answers the AI has already written stay as they were; new answers follow the new language. The Start question includes an example of how to begin.
 
-All interface text is in `public/i18n.js`. The isiZulu and Afrikaans text is a **draft** and must be checked by GRIT's native speakers. To correct a line, change the text after the colon and keep the key before it. No other code needs to change.
+English page text is in `public/i18n.js`; every other language is in `public/i18n/<code>.json`. The isiZulu and Afrikaans text written earlier is marked **draft**, and the isiZulu fill opening, written by a native speaker, **checked**. To correct translations, use the spreadsheet route in `translations/README.md`.
 
 ## Sources (developer view)
 
@@ -299,6 +320,16 @@ Users do not see which document each answer came from. To see it, open the site 
 - Reading aloud sends the text in the body of the request, never in its address, so it does not appear in Google's request logs.
 - The model never logs what people write; only error messages are logged.
 
+## Service directory
+
+The service directory (courts, police stations, Thuthuzela Care Centres, shelters, helplines and support services, shared with Zuzi) is defined in `lib/core/directory.js`, with Zuzi's referral tiers and contact statuses. An entry is only ready to be shown when it is active, verified and checked in the last 6 months. The working sheet stays in GRIT's Google Drive; `npm run directory check` checks it and `npm run directory upload` loads it into Firestore. `directory/README.md` explains every column. inFORMed does not use the directory in conversations yet.
+
+## Golden and red-team tests
+
+`npm test` checks that the code works, with a pretend AI. `npm run golden` checks the quality of real answers: 50 made-up conversations in `test/golden/protection-order.json` run against the real model, in every official language, covering danger in different languages, suicidal messages, distress, province, tick boxes, one question at a time, English on the form, and red-team attempts (asking for the instructions, asking to exaggerate, an abuser trying to find someone, invented phone numbers, legal advice). Each case has automatic checks, and plain rules read by a second AI. Three cases wait for GRIT's decisions (under 18, criminal case, after hours): they are reported but not counted.
+
+It needs the OpenAI key in that Command Prompt window (Notepad file, as in `translations/README.md`), then `npm run golden` (or `npm run golden -- --group safety`, or `npm run golden -- --only danger-zu`). It writes `review/golden-report.md`, with every reply and every check. Run it after a batch of changes, not after every change; one full run costs very little.
+
 ## Changes from GRIT's v8.14 system prompt
 
 - The "is this conversation tracked" reply said the chat is used to train the bot. That is not true for this build (`store: false`), so it now says the chat is not saved after it is closed. Please confirm the wording with GRIT.
@@ -307,8 +338,8 @@ Users do not see which document each answer came from. To see it, open the site 
 
 ## Before real users (not needed for the demo)
 
-- Voice: test isiZulu speech recognition and read-aloud with native speakers. They are passed as hints, and quality for isiZulu is not yet known. Afrikaans and English are supported directly.
-- isiZulu and Afrikaans replies are written by the model. Native speakers at GRIT should review them, and the fixed safety replies need GRIT-approved translations (currently sent in English).
+- Voice: test speech recognition and read-aloud with native speakers in each language. Languages are passed as hints, and quality outside English and Afrikaans is not yet known.
+- Replies in every language are written by the model, and the fixed wording is translated by the model. Native speakers at GRIT should review the replies (`npm run golden` has a case in every language), and the emergency replies, support line and openings need checking by a native speaker and the safeguarding lead (`npm run translations` shows what is still made by the model).
 - Safeguarding sign-off on the crisis replies and flow.
 - A POPIA review of the 24-hour WhatsApp storage in Firestore.
 - Switch on the three Firestore TTL policies (see Hosting), and check the internet address line in the log after the first deploy.
